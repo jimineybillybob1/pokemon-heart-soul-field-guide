@@ -109,6 +109,8 @@ function runApp(savedState = null, options = {}) {
       atob(value) {
         return Buffer.from(value, "base64").toString("binary");
       },
+      encodeURIComponent,
+      decodeURIComponent,
       navigator: { clipboard: { writeText: async () => {} } },
     });
   }
@@ -162,7 +164,6 @@ speciesModalApp.click("[data-open-species]");
 defaultApp.elementFor("[data-open-moves]").dataset.openMoves = "Bulbasaur";
 defaultApp.click("[data-open-moves]");
 const syncApp = runApp(null, { crypto: true });
-syncApp.elementFor("#sync-passphrase").value = "heart-soul-test";
 syncApp.click("#create-sync-code");
 await new Promise((resolve) => setTimeout(resolve, 100));
 
@@ -171,6 +172,7 @@ const checks = {
   locationStat: defaultApp.elementFor("#stat-locations").textContent,
   dexCardsRendered: defaultApp.elementFor("#dex-grid").innerHTML.includes("Bulbasaur"),
   dexInitialCardCount: (defaultApp.elementFor("#dex-grid").innerHTML.match(/data-species-card=/g) || []).length,
+  dexSortControlRendered: defaultApp.elementFor("#dex-controls").innerHTML.includes("id=\"dex-sort\"") && defaultApp.elementFor("#dex-controls").innerHTML.includes("Sp. Atk"),
   dexCardsHaveMovesButton: defaultApp.elementFor("#dex-grid").innerHTML.includes("data-open-moves"),
   dexCardsHaveAbilityButtons: defaultApp.elementFor("#dex-grid").innerHTML.includes("ability-button") && defaultApp.elementFor("#dex-grid").innerHTML.includes("Powers up Grass moves"),
   dexCardsDoNotUseDetailsPane: !defaultApp.elementFor("#dex-grid").innerHTML.includes("<details"),
@@ -204,9 +206,12 @@ const checks = {
   bossBattleResultsRendered: bossApp.elementFor("#battle-results").innerHTML.includes("Offensive Answers") && bossApp.elementFor("#battle-results").innerHTML.includes("Defensive Threats"),
   saveRendered:
     defaultApp.elementFor("#save-panel").innerHTML.includes("Export save") &&
-    defaultApp.elementFor("#save-panel").innerHTML.includes("Encrypted Sync") &&
+    defaultApp.elementFor("#save-panel").innerHTML.includes("Sync Code") &&
+    defaultApp.elementFor("#save-panel").innerHTML.includes("Device Status") &&
+    defaultApp.elementFor("#save-panel").innerHTML.includes("Check latest") &&
+    !defaultApp.elementFor("#save-panel").innerHTML.includes("Passphrase") &&
     defaultApp.elementFor("#save-panel").innerHTML.includes("Recovery"),
-  syncCodeCreated: syncApp.elementFor("#sync-code").value.startsWith("HNS1."),
+  syncCodeCreated: syncApp.elementFor("#sync-code").value.startsWith("HNS2."),
 };
 
 console.log(JSON.stringify(checks, null, 2));
@@ -216,6 +221,7 @@ if (
   String(checks.locationStat) !== "144" ||
   !checks.dexCardsRendered ||
   checks.dexInitialCardCount !== 50 ||
+  !checks.dexSortControlRendered ||
   !checks.dexCardsHaveMovesButton ||
   !checks.dexCardsHaveAbilityButtons ||
   !checks.dexCardsDoNotUseDetailsPane ||

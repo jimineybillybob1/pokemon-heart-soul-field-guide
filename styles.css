@@ -382,7 +382,7 @@ textarea {
 .card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
-  align-items: start;
+  align-items: stretch;
   gap: 14px;
 }
 
@@ -407,7 +407,10 @@ textarea {
 }
 
 .pokemon-card {
+  min-width: 0;
   min-height: 0;
+  height: 100%;
+  grid-template-rows: auto auto minmax(52px, auto) minmax(92px, auto) minmax(58px, auto) auto;
 }
 
 .pokemon-head {
@@ -457,6 +460,18 @@ textarea {
 
 .pokemon-title h3 {
   font-size: 1.22rem;
+}
+
+.pokemon-title h3,
+.evolution-link strong,
+.encounter-link strong,
+.trainer-heading h3,
+.trainer-mon strong,
+.slot-preview strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .pokemon-title small,
@@ -600,6 +615,7 @@ textarea {
   position: relative;
   display: inline-flex;
   align-items: center;
+  gap: 6px;
   min-height: 28px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -609,6 +625,18 @@ textarea {
   cursor: help;
   font-size: 0.78rem;
   font-weight: 900;
+}
+
+.ability-tag {
+  display: inline-grid;
+  place-items: center;
+  min-width: 24px;
+  min-height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent-3) 18%, var(--surface));
+  color: var(--accent-3);
+  font-size: 0.64rem;
 }
 
 .ability-button:hover,
@@ -672,7 +700,7 @@ textarea {
 
 .evolution-links {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
   gap: 8px;
 }
 
@@ -694,6 +722,10 @@ textarea {
 .evolution-link span {
   display: grid;
   min-width: 0;
+}
+
+.evolution-link strong {
+  display: block;
 }
 
 .evolution-link small,
@@ -790,6 +822,8 @@ summary {
 .save-card,
 .panel,
 .slot-card {
+  min-width: 0;
+  overflow: hidden;
   padding: 14px;
 }
 
@@ -805,10 +839,15 @@ summary {
   margin-bottom: 10px;
 }
 
+.trainer-card header {
+  align-items: flex-start;
+}
+
 .trainer-actions {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
+  flex: 0 0 auto;
   gap: 8px;
 }
 
@@ -987,7 +1026,7 @@ summary {
 
 .trainer-team {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 10px;
 }
 
@@ -996,6 +1035,7 @@ summary {
   grid-template-columns: 54px minmax(0, 1fr);
   align-items: center;
   gap: 10px;
+  min-width: 0;
 }
 
 .trainer-avatar {
@@ -1044,6 +1084,11 @@ summary {
   grid-template-columns: 42px minmax(0, 1fr);
   gap: 9px;
   align-items: start;
+  min-width: 0;
+}
+
+.trainer-mon > div {
+  min-width: 0;
 }
 
 .trainer-mon strong,
@@ -1306,9 +1351,35 @@ summary {
 }
 
 .sync-grid,
-.backup-list {
+.backup-list,
+.status-grid {
   display: grid;
   gap: 10px;
+}
+
+.status-grid {
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+}
+
+.status-grid div {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.status-grid small,
+.status-grid strong {
+  display: block;
+}
+
+.status-grid small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .sync-code-area {
@@ -1426,7 +1497,11 @@ summary {
 }
 
 .species-modal {
+  inset: 50% auto auto 50%;
   grid-template-rows: auto minmax(0, 1fr);
+  width: min(760px, calc(100vw - 32px));
+  max-height: min(760px, calc(100vh - 48px));
+  transform: translate(-50%, -50%);
 }
 
 .species-modal-head {
@@ -1484,6 +1559,7 @@ summary {
 
 .species-modal-links {
   grid-column: 1 / -1;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   margin-top: 0;
 }
 
@@ -1634,6 +1710,13 @@ summary {
     padding: 12px;
   }
 
+  .species-modal {
+    inset: 10px;
+    width: calc(100vw - 20px);
+    max-height: calc(100vh - 20px);
+    transform: none;
+  }
+
   .modal-head,
   .modal-summary {
     align-items: flex-start;
@@ -1651,6 +1734,7 @@ summary {
 
   .species-modal-links {
     grid-column: auto;
+    grid-template-columns: 1fr;
   }
 
   .modal-summary {

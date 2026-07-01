@@ -10,7 +10,8 @@
   const saveFormat = "heart-soul-field-guide-save";
   const saveVersion = 1;
   const maxLocalBackups = 5;
-  const syncCodePrefix = "HNS1";
+  const syncCodePrefix = "HNS2";
+  const appShellVersion = "heart-soul-field-guide-v4";
   const species = [...data.species].sort((a, b) => Number(a.dex || 0) - Number(b.dex || 0));
   const speciesByName = new Map(species.map((entry) => [entry.name, entry]));
   const moveByName = new Map(data.moves.map((move) => [move.name, move]));
@@ -160,6 +161,7 @@
     dexType: "",
     dexAvailability: "",
     dexCaughtOnly: false,
+    dexSort: "dex",
     locationSearch: "",
     itemSearch: "",
     itemType: "",
@@ -362,6 +364,11 @@
         return;
       }
 
+      if (event.target.closest("#check-version")) {
+        checkLatestVersion();
+        return;
+      }
+
       const restoreBackupButton = event.target.closest("[data-restore-backup]");
       if (restoreBackupButton) {
         restoreLocalBackup(restoreBackupButton.dataset.restoreBackup);
@@ -435,6 +442,10 @@
       filters.dexCaughtOnly = target.checked;
       resetDexLimit();
       renderDex();
+    } else if (target.matches("#dex-sort")) {
+      filters.dexSort = target.value;
+      resetDexLimit();
+      renderDex();
     } else if (target.matches("#item-type")) {
       filters.itemType = target.value;
       renderItems();
@@ -459,7 +470,7 @@
       const entry = speciesByName.get(target.value);
       state.team[index] = {
         species: entry ? entry.name : "",
-        ability: entry?.abilities?.[0] || "",
+        ability: entry ? defaultAbility(entry) : "",
         moves: ["", "", "", ""],
       };
       persistAndRenderTeam();
@@ -513,6 +524,17 @@
     const typeOptions = ["", ...typeNames].map((type) => option(type, type || "Any type")).join("");
     const itemTypes = unique(data.items.map((item) => item.type)).sort();
     const trainerCategoryOptions = trainerCategories;
+    const dexSortOptions = [
+      ["dex", "Dex number"],
+      ["name", "Name"],
+      ["bst", "BST"],
+      ["hp", "HP"],
+      ["atk", "Attack"],
+      ["def", "Defense"],
+      ["spa", "Sp. Atk"],
+      ["spd", "Sp. Def"],
+      ["spe", "Speed"],
+    ];
     els.dexControls.innerHTML = `
       <label class="field grow"><span>Search</span><input id="dex-search" type="search" placeholder="Pokemon, ability, item, location" value="${attr(filters.dexSearch)}" /></label>
       <label class="field"><span>Type</span><select id="dex-type">${typeOptions}</select></label>
@@ -522,6 +544,7 @@
         ${option("static", "Static, gift, trade")}
         ${option("none", "No location listed")}
       </select></label>
+      <label class="field"><span>Sort by</span><select id="dex-sort">${dexSortOptions.map(([value, label]) => option(value, label, filters.dexSort === value)).join("")}</select></label>
       <label class="field checkbox-field"><span>Progress</span><span class="check-control"><input id="dex-caught-only" type="checkbox" ${filters.dexCaughtOnly ? "checked" : ""} /> Caught only</span></label>
     `;
     els.locationControls.innerHTML = `
@@ -571,14 +594,30 @@
         (!filters.dexCaughtOnly || state.caught[entry.name])
       );
     });
-    dexFilteredCount = filtered.length;
-    const visible = filtered.slice(0, dexVisibleCount);
+    const sorted = sortSpecies(filtered);
+    dexFilteredCount = sorted.length;
+    const visible = sorted.slice(0, dexVisibleCount);
     els.dexCount.textContent = `Showing ${visible.length} of ${filtered.length}`;
     els.dexGrid.innerHTML =
       visible.map(renderDexCard).join("") +
-        (filtered.length > visible.length
-          ? `<div class="load-more-card"><button class="button" type="button" data-load-more-dex>Load more</button><span class="muted">${filtered.length - visible.length} remaining</span></div>`
+        (sorted.length > visible.length
+          ? `<div class="load-more-card"><button class="button" type="button" data-load-more-dex>Load more</button><span class="muted">${sorted.length - visible.length} remaining</span></div>`
           : "") || empty("No Pokemon match those filters.");
+  }
+
+  function sortSpecies(entries) {
+    const sortKey = filters.dexSort || "dex";
+    return [...entries].sort((a, b) => {
+      if (sortKey === "name") return a.name.localeCompare(b.name) || Number(a.dex || 0) - Number(b.dex || 0);
+      if (sortKey === "dex") return Number(a.dex || 0) - Number(b.dex || 0) || a.name.localeCompare(b.name);
+      const diff = Number(sortValue(b, sortKey)) - Number(sortValue(a, sortKey));
+      return diff || Number(a.dex || 0) - Number(b.dex || 0) || a.name.localeCompare(b.name);
+    });
+  }
+
+  function sortValue(entry, sortKey) {
+    if (sortKey === "bst") return entry.bst || 0;
+    return entry.stats?.[sortKey] || 0;
   }
 
   function renderDexCard(entry) {
@@ -594,7 +633,7 @@
               <span class="metric-badge"><small>Dex</small><strong>#${paddedDex(entry.dex)}</strong></span>
               <span class="metric-badge"><small>BST</small><strong>${value(entry.bst)}</strong></span>
             </div>
-            <h3>${text(entry.name)}</h3>
+            <h3 title="${attr(entry.name)}">${text(entry.name)}</h3>
             <div class="type-row">${entry.types.map(typePill).join("")}</div>
           </div>
           <button class="small-button caught-toggle ${caught ? "is-caught" : ""}" type="button" data-caught="${attr(entry.name)}">${caught ? "Caught" : "Mark caught"}</button>
@@ -622,20 +661,54 @@
   }
 
   function displayAbilities(entry) {
-    const abilities = unique(entry.abilities).filter(Boolean);
-    const realAbilities = abilities.filter((ability) => normalize(ability) !== "none");
+    const records = [];
+    (entry.abilities || []).forEach((ability) => records.push({ name: abilityName(ability), hidden: abilityIsHidden(ability) }));
+    [entry.hiddenAbility, ...(entry.hiddenAbilities || [])].forEach((ability) => {
+      if (ability) records.push({ name: abilityName(ability), hidden: true });
+    });
+    const merged = [];
+    records.forEach((record) => {
+      if (!record.name) return;
+      const existing = merged.find((item) => normalize(item.name) === normalize(record.name));
+      if (existing) {
+        existing.hidden = existing.hidden || record.hidden;
+      } else {
+        merged.push(record);
+      }
+    });
+    const realAbilities = merged.filter((ability) => normalize(ability.name) !== "none");
     if (realAbilities.length) return realAbilities;
-    return abilities.length === 1 ? abilities : [];
+    return merged.length === 1 ? merged : [];
   }
 
   function renderAbilityButton(ability) {
-    const detail = abilityDetails[normalize(ability)] || "No ability details listed.";
+    const record = typeof ability === "string" ? { name: ability, hidden: false } : ability;
+    const detail = abilityDetails[normalize(record.name)] || "No ability details listed.";
     return `
-      <button class="ability-button" type="button" aria-label="${attr(`${ability}: ${detail}`)}">
-        <span>${text(ability)}</span>
+      <button class="ability-button" type="button" aria-label="${attr(`${record.name}: ${detail}`)}">
+        <span>${text(record.name)}</span>
+        ${record.hidden ? '<span class="ability-tag">HA</span>' : ""}
         <span class="ability-popover" role="tooltip">${text(detail)}</span>
       </button>
     `;
+  }
+
+  function abilityName(ability) {
+    if (!ability) return "";
+    if (typeof ability === "object") return ability.name || ability.ability || "";
+    return String(ability);
+  }
+
+  function abilityIsHidden(ability) {
+    return Boolean(
+      ability &&
+        typeof ability === "object" &&
+        (ability.hidden || ability.isHidden || normalize(ability.slot) === "hidden" || normalize(ability.kind) === "hidden"),
+    );
+  }
+
+  function defaultAbility(entry) {
+    return displayAbilities(entry)[0]?.name || "";
   }
 
   function resetDexLimit() {
@@ -707,7 +780,7 @@
             return `
               <button class="evolution-link" type="button" data-jump-species="${attr(link.target)}">
                 ${miniSprite(target)}
-                <span><small>${text(link.direction)}</small><strong>${text(link.target)}</strong><em>${text(link.detail || "Evolution")}</em></span>
+                <span><small>${text(link.direction)}</small><strong title="${attr(link.target)}">${text(link.target)}</strong><em>${text(link.detail || "Evolution")}</em></span>
               </button>
             `;
           })
@@ -732,7 +805,7 @@
                 <span class="metric-badge"><small>Dex</small><strong>#${paddedDex(entry.dex)}</strong></span>
                 <span class="metric-badge"><small>BST</small><strong>${value(entry.bst)}</strong></span>
               </div>
-              <h3 id="species-modal-title">${text(entry.name)}</h3>
+              <h3 id="species-modal-title" title="${attr(entry.name)}">${text(entry.name)}</h3>
               <div class="type-row">${entry.types.map(typePill).join("")}</div>
             </div>
           </div>
@@ -1118,7 +1191,7 @@
             ${trainerSprite(trainer)}
             <div>
               <small class="muted">${text(trainer.category)}</small>
-              <h3>${text(trainer.name)}</h3>
+              <h3 title="${attr(trainer.name)}">${text(trainer.name)}</h3>
             </div>
           </div>
           <div class="trainer-actions">
@@ -1141,7 +1214,7 @@
       <div class="trainer-mon">
         ${miniSprite(entry)}
         <div>
-          <strong>${text(mon.species)}${mon.level ? ` Lv ${value(mon.level)}` : ""}</strong>
+          <strong title="${attr(mon.species)}">${text(mon.species)}${mon.level ? ` Lv ${value(mon.level)}` : ""}</strong>
           ${entry ? `<div class="type-row">${entry.types.map(typePill).join("")}</div>` : ""}
           ${mon.item ? `<small>Item: ${text(mon.item)}</small>` : ""}
           ${mon.moves.length ? `<div class="mini-list">${mon.moves.map((move) => `<span class="chip">${text(move)}</span>`).join("")}</div>` : ""}
@@ -1203,14 +1276,17 @@
   function renderTeamSlot(slot, index) {
     const entry = speciesByName.get(slot.species);
     const moveChoices = entry ? compatibleMoves(entry) : [];
-    const abilityOptions = ["", ...(entry ? displayAbilities(entry) : [])].map((ability) => option(ability, ability || "Ability")).join("");
+    const abilityOptions = [
+      option("", "Ability"),
+      ...(entry ? displayAbilities(entry).map((ability) => option(ability.name, ability.hidden ? `${ability.name} (HA)` : ability.name, slot.ability === ability.name)) : []),
+    ].join("");
     return `
       <article class="slot-card">
         <header>
           <h3>Slot ${index + 1}</h3>
           <button class="small-button" type="button" data-clear-team="${index}">Clear</button>
         </header>
-        ${entry ? `<div class="slot-preview">${sprite(entry)}<div><strong>${text(entry.name)}</strong><div class="type-row">${entry.types.map(typePill).join("")}</div></div></div>` : ""}
+        ${entry ? `<div class="slot-preview">${sprite(entry)}<div><strong title="${attr(entry.name)}">${text(entry.name)}</strong><div class="type-row">${entry.types.map(typePill).join("")}</div></div></div>` : ""}
         <div class="slot-body">
           <label class="field"><span>Pokemon</span><select data-team-species="${index}">${speciesSelect(slot.species)}</select></label>
           <label class="field"><span>Ability</span><select data-team-ability="${index}">${abilityOptions}</select></label>
@@ -1242,7 +1318,7 @@
           <h3>Plan ${index + 1}</h3>
           <button class="small-button" type="button" data-clear-planner="${index}">Clear</button>
         </header>
-        ${entry ? `<div class="slot-preview">${sprite(entry)}<div><strong>${text(entry.name)}</strong><div class="type-row">${entry.types.map(typePill).join("")}</div></div></div>` : ""}
+        ${entry ? `<div class="slot-preview">${sprite(entry)}<div><strong title="${attr(entry.name)}">${text(entry.name)}</strong><div class="type-row">${entry.types.map(typePill).join("")}</div></div></div>` : ""}
         <label class="field"><span>Pokemon</span><select data-planner-species="${index}">${speciesSelect(slot.species)}</select></label>
         ${entry ? renderAvailability(entry) : '<div class="availability-box muted">Pick a Pokemon to see locations.</div>'}
         <label class="field"><span>Notes</span><textarea data-planner-note="${index}" placeholder="Role, nature, route timing, item plan">${text(slot.note || "")}</textarea></label>
@@ -1571,7 +1647,7 @@
   function renderSave() {
     const save = makeSaveDocument();
     const backups = getLocalBackups();
-    const syncReady = syncCryptoAvailable();
+    const syncReady = syncCodeAvailable();
     els.savePanel.innerHTML = `
       <article class="save-card">
         <header><h3>Progress Summary</h3><span class="chip">Autosaved</span></header>
@@ -1595,16 +1671,28 @@
         <p class="save-status" id="save-operation-status" aria-live="polite"></p>
       </article>
       <article class="save-card">
-        <header><h3>Encrypted Sync</h3><span class="chip">${syncReady ? "Ready" : "Unavailable"}</span></header>
+        <header><h3>Sync Code</h3><span class="chip">${syncReady ? "Ready" : "Unavailable"}</span></header>
         <div class="sync-grid">
-          <label class="field"><span>Passphrase</span><input id="sync-passphrase" type="password" autocomplete="current-password" placeholder="Private sync phrase" /></label>
-          <label class="field"><span>Sync code</span><textarea id="sync-code" class="sync-code-area" spellcheck="false" placeholder="Encrypted save code"></textarea></label>
+          <label class="field"><span>Sync code</span><textarea id="sync-code" class="sync-code-area" spellcheck="false" placeholder="Create or paste a Heart & Soul sync code"></textarea></label>
         </div>
         <div class="save-actions">
           <button class="button" id="create-sync-code" type="button" ${syncReady ? "" : "disabled"}>Create code</button>
           <button class="button" id="copy-sync-code" type="button" ${syncReady ? "" : "disabled"}>Copy code</button>
           <button class="button" id="load-sync-code" type="button" ${syncReady ? "" : "disabled"}>Load code</button>
         </div>
+      </article>
+      <article class="save-card">
+        <header><h3>Device Status</h3><span class="chip">Guide ${text(data.meta.version || "1.0")}</span></header>
+        <div class="status-grid">
+          <div><small>Guide data</small><strong>${text(formatDate(data.meta.generatedAt))}</strong></div>
+          <div><small>App shell</small><strong>${text(appShellVersion.replace("heart-soul-field-guide-", ""))}</strong></div>
+          <div><small>Save format</small><strong>v${saveVersion}</strong></div>
+          <div><small>Local revision</small><strong>${value(save.revision)}</strong></div>
+        </div>
+        <div class="save-actions">
+          <button class="button" id="check-version" type="button">Check latest</button>
+        </div>
+        <p class="save-status" id="version-check-status" aria-live="polite">This device last loaded guide data from ${text(formatDate(data.meta.generatedAt))}.</p>
       </article>
       <article class="save-card">
         <header><h3>Recovery</h3><span class="chip">${backups.length} backups</span></header>
@@ -1653,7 +1741,7 @@
     }
     const entry = speciesByName.get(name);
     slot.species = name;
-    slot.ability = entry?.abilities?.[0] || "";
+    slot.ability = entry ? defaultAbility(entry) : "";
     slot.moves = ["", "", "", ""];
     persistAndRenderTeam();
     showView("team");
@@ -1900,12 +1988,10 @@
 
   async function createSyncCode() {
     try {
-      const passphrase = syncPassphrase();
-      if (!passphrase) throw new Error("Enter a passphrase first.");
-      const code = await encryptSyncPayload(makeSaveDocument(), passphrase);
+      const code = encodeSyncPayload(makeSaveDocument());
       const output = document.querySelector("#sync-code");
       if (output) output.value = code;
-      setSaveStatus("Encrypted sync code created.", "success");
+      setSaveStatus("Sync code created.", "success");
     } catch (error) {
       setSaveStatus(error.message || "Could not create sync code.", "error");
     }
@@ -1925,85 +2011,84 @@
 
   async function loadSyncCode() {
     try {
-      const passphrase = syncPassphrase();
       const code = document.querySelector("#sync-code")?.value.trim();
-      if (!passphrase) throw new Error("Enter the passphrase for this sync code.");
       if (!code) throw new Error("Paste a sync code first.");
-      const save = await decryptSyncPayload(code, passphrase);
-      if (!confirm("Replace this browser's current Heart & Soul progress with the encrypted sync code?")) return;
+      const save = decodeSyncPayload(code);
+      if (!confirm("Replace this browser's current Heart & Soul progress with this sync code?")) return;
       applySaveDocument(save, { source: "sync" });
-      setSaveStatus("Encrypted sync code loaded. A recovery backup was kept.", "success");
+      setSaveStatus("Sync code loaded. A recovery backup was kept.", "success");
     } catch (error) {
       setSaveStatus(error.message || "Could not load sync code.", "error");
     }
   }
 
-  function syncPassphrase() {
-    return document.querySelector("#sync-passphrase")?.value.trim() || "";
+  function syncCodeAvailable() {
+    return Boolean(window.btoa && window.atob && window.encodeURIComponent && window.decodeURIComponent);
   }
 
-  function syncCryptoAvailable() {
-    return Boolean(
-      window.crypto?.subtle &&
-        window.crypto.getRandomValues &&
-        window.TextEncoder &&
-        window.TextDecoder &&
-        window.btoa &&
-        window.atob,
-    );
+  function encodeSyncPayload(save) {
+    if (!syncCodeAvailable()) throw new Error("Sync codes are not available in this browser.");
+    return `${syncCodePrefix}.${stringToBase64Url(JSON.stringify(save))}`;
   }
 
-  async function encryptSyncPayload(save, passphrase) {
-    if (!syncCryptoAvailable()) throw new Error("Encrypted sync is not available in this browser.");
-    const salt = window.crypto.getRandomValues(new Uint8Array(16));
-    const iv = window.crypto.getRandomValues(new Uint8Array(12));
-    const key = await deriveSyncKey(passphrase, salt);
-    const encoded = new TextEncoder().encode(JSON.stringify(save));
-    const encrypted = new Uint8Array(await window.crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, encoded));
-    return [syncCodePrefix, bytesToBase64Url(salt), bytesToBase64Url(iv), bytesToBase64Url(encrypted)].join(".");
-  }
-
-  async function decryptSyncPayload(code, passphrase) {
-    if (!syncCryptoAvailable()) throw new Error("Encrypted sync is not available in this browser.");
+  function decodeSyncPayload(code) {
+    if (!syncCodeAvailable()) throw new Error("Sync codes are not available in this browser.");
     const parts = code.split(".");
-    if (parts.length !== 4 || parts[0] !== syncCodePrefix) throw new Error("This is not a Heart & Soul sync code.");
-    const salt = base64UrlToBytes(parts[1]);
-    const iv = base64UrlToBytes(parts[2]);
-    const encrypted = base64UrlToBytes(parts[3]);
-    const key = await deriveSyncKey(passphrase, salt);
-    try {
-      const decrypted = await window.crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, encrypted);
-      return JSON.parse(new TextDecoder().decode(decrypted));
-    } catch {
-      throw new Error("The passphrase does not unlock this sync code.");
-    }
+    if (parts.length !== 2 || parts[0] !== syncCodePrefix) throw new Error("This is not a current Heart & Soul sync code.");
+    return JSON.parse(base64UrlToString(parts[1]));
   }
 
-  async function deriveSyncKey(passphrase, salt) {
-    const baseKey = await window.crypto.subtle.importKey("raw", new TextEncoder().encode(passphrase), "PBKDF2", false, [
-      "deriveKey",
-    ]);
-    return window.crypto.subtle.deriveKey(
-      { name: "PBKDF2", salt, iterations: 120000, hash: "SHA-256" },
-      baseKey,
-      { name: "AES-GCM", length: 256 },
-      false,
-      ["encrypt", "decrypt"],
-    );
-  }
-
-  function bytesToBase64Url(bytes) {
-    let binary = "";
-    bytes.forEach((byte) => {
-      binary += String.fromCharCode(byte);
-    });
+  function stringToBase64Url(value) {
+    const binary = window.encodeURIComponent(value).replace(/%([0-9A-F]{2})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
     return window.btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
   }
 
-  function base64UrlToBytes(value) {
+  function base64UrlToString(value) {
     const base64 = value.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(value.length / 4) * 4, "=");
     const binary = window.atob(base64);
-    return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+    const escaped = Array.from(binary, (char) => `%${char.charCodeAt(0).toString(16).padStart(2, "0")}`).join("");
+    return window.decodeURIComponent(escaped);
+  }
+
+  async function checkLatestVersion() {
+    setVersionStatus("Checking published guide files...", "");
+    try {
+      if (!window.fetch) throw new Error("Version checks are not available in this browser.");
+      const stamp = Date.now();
+      const [dataText, shellText] = await Promise.all([
+        fetch(`data/heart-soul-data.js?check=${stamp}`, { cache: "no-store" }).then(readVersionResponse),
+        fetch(`sw.js?check=${stamp}`, { cache: "no-store" }).then(readVersionResponse),
+      ]);
+      const latestData = parseGuideDataScript(dataText);
+      const latestShell = shellText.match(/CACHE_NAME\s*=\s*"([^"]+)"/)?.[1] || "";
+      const dataMatches = latestData?.meta?.generatedAt === data.meta.generatedAt;
+      const shellMatches = latestShell === appShellVersion;
+      if (dataMatches && shellMatches) {
+        setVersionStatus("This device is using the latest published guide files.", "success");
+      } else {
+        setVersionStatus("A newer guide version is published. Reload this page on this device, then create a fresh sync code.", "error");
+      }
+    } catch (error) {
+      setVersionStatus(error.message || "Could not check the published guide version.", "error");
+    }
+  }
+
+  async function readVersionResponse(response) {
+    if (!response.ok) throw new Error("Could not reach the published guide files.");
+    return response.text();
+  }
+
+  function parseGuideDataScript(scriptText) {
+    const match = scriptText.match(/window\.HEART_SOUL_DATA\s*=\s*(\{[\s\S]*\});?\s*$/);
+    if (!match) throw new Error("Published guide data could not be read.");
+    return JSON.parse(match[1]);
+  }
+
+  function setVersionStatus(message, status) {
+    const target = document.querySelector("#version-check-status");
+    if (!target) return;
+    target.textContent = message;
+    target.dataset.status = status || "";
   }
 
   function getLocalBackups() {
