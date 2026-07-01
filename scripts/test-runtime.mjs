@@ -7,6 +7,8 @@ const appScript = fs.readFileSync("app.js", "utf8");
 const saveKey = "heart-soul-field-guide-save-v1";
 
 class FakeClassList {
+  add() {}
+  remove() {}
   toggle() {}
 }
 
@@ -154,6 +156,8 @@ const bossState = {
   battleTargets: ["", ""],
 };
 const bossApp = runApp(bossState);
+defaultApp.elementFor("[data-open-moves]").dataset.openMoves = "Bulbasaur";
+defaultApp.click("[data-open-moves]");
 const syncApp = runApp(null, { crypto: true });
 syncApp.elementFor("#sync-passphrase").value = "heart-soul-test";
 syncApp.click("#create-sync-code");
@@ -163,6 +167,12 @@ const checks = {
   speciesStat: defaultApp.elementFor("#stat-species").textContent,
   locationStat: defaultApp.elementFor("#stat-locations").textContent,
   dexCardsRendered: defaultApp.elementFor("#dex-grid").innerHTML.includes("Bulbasaur"),
+  dexCardsHaveMovesButton: defaultApp.elementFor("#dex-grid").innerHTML.includes("data-open-moves"),
+  dexCardsDoNotUseDetailsPane: !defaultApp.elementFor("#dex-grid").innerHTML.includes("<details"),
+  movesModalRendered:
+    defaultApp.elementFor("#modal-root").innerHTML.includes("Bulbasaur Moves") &&
+    defaultApp.elementFor("#modal-root").innerHTML.includes("Vine Whip") &&
+    defaultApp.elementFor("#modal-root").innerHTML.includes("data-jump-item"),
   trainerPlanButtonsRendered: defaultApp.elementFor("#trainer-list").innerHTML.includes("Plan this trainer"),
   teamSlotsRendered: (defaultApp.elementFor("#team-grid").innerHTML.match(/Slot /g) || []).length,
   customBattlePlannerRendered: defaultApp.elementFor("#battle-targets").innerHTML.includes("Custom targets"),
@@ -181,6 +191,9 @@ if (
   String(checks.speciesStat) !== "423" ||
   String(checks.locationStat) !== "144" ||
   !checks.dexCardsRendered ||
+  !checks.dexCardsHaveMovesButton ||
+  !checks.dexCardsDoNotUseDetailsPane ||
+  !checks.movesModalRendered ||
   !checks.trainerPlanButtonsRendered ||
   checks.teamSlotsRendered !== 6 ||
   !checks.customBattlePlannerRendered ||

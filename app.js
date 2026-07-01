@@ -14,6 +14,14 @@
   const species = [...data.species].sort((a, b) => Number(a.dex || 0) - Number(b.dex || 0));
   const speciesByName = new Map(species.map((entry) => [entry.name, entry]));
   const moveByName = new Map(data.moves.map((move) => [move.name, move]));
+  const itemsByMove = new Map();
+  data.items.forEach((item) => {
+    if (!item.move) return;
+    const list = itemsByMove.get(item.move) || [];
+    list.push(item);
+    itemsByMove.set(item.move, list);
+  });
+  const tutorsByMove = new Map(data.tutors.map((tutor) => [tutor.move, tutor]));
   const trainersById = new Map(data.trainers.map((trainer) => [trainer.id, trainer]));
   const trainerCategories = unique(data.trainers.map((trainer) => trainer.category)).sort((a, b) => a.localeCompare(b));
   const typeNames = [
@@ -107,6 +115,7 @@
     battleResults: document.querySelector("#battle-results"),
     moreGrid: document.querySelector("#more-grid"),
     savePanel: document.querySelector("#save-panel"),
+    modalRoot: document.querySelector("#modal-root"),
     themeToggle: document.querySelector("#theme-toggle"),
   };
 
@@ -170,6 +179,41 @@
         return;
       }
 
+      const movesButton = event.target.closest("[data-open-moves]");
+      if (movesButton) {
+        openMovesModal(movesButton.dataset.openMoves);
+        return;
+      }
+
+      const speciesJump = event.target.closest("[data-jump-species]");
+      if (speciesJump) {
+        jumpToSpecies(speciesJump.dataset.jumpSpecies);
+        return;
+      }
+
+      const locationJump = event.target.closest("[data-jump-location]");
+      if (locationJump) {
+        jumpToLocation(locationJump.dataset.jumpLocation);
+        return;
+      }
+
+      const itemJump = event.target.closest("[data-jump-item]");
+      if (itemJump) {
+        jumpToItem(itemJump.dataset.jumpItem);
+        return;
+      }
+
+      const moveJump = event.target.closest("[data-jump-move]");
+      if (moveJump) {
+        jumpToMove(moveJump.dataset.jumpMove);
+        return;
+      }
+
+      if (event.target.closest("[data-close-modal]")) {
+        closeModal();
+        return;
+      }
+
       const clearTeam = event.target.closest("[data-clear-team]");
       if (clearTeam) {
         state.team[Number(clearTeam.dataset.clearTeam)] = blankTeamSlot();
@@ -224,6 +268,9 @@
 
     document.addEventListener("input", handleInput);
     document.addEventListener("change", handleChange);
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") closeModal();
+    });
 
     els.themeToggle.addEventListener("click", () => {
       state.theme = state.theme === "dark" ? "light" : "dark";
@@ -409,15 +456,9 @@
 
   function renderDexCard(entry) {
     const caught = Boolean(state.caught[entry.name]);
-    const levelMoves = entry.learnsets.level.slice(0, 16).map((move) => `Lv ${value(move.level)} ${text(move.move)}`).join(", ");
-    const tmMoves = entry.learnsets.tmhm.slice(0, 22).map(text).join(", ");
-    const tutorMoves = entry.learnsets.tutor.slice(0, 18).map(text).join(", ");
-    const eggMoves = entry.learnsets.egg.slice(0, 18).map(text).join(", ");
     const availability = renderAvailability(entry);
-    const evoOut = entry.evolutions.map((evo) => `${text(evo.to)} via ${text(joinParts([evo.method, evo.requirement, evo.conditions]))}`);
-    const evoIn = entry.evolvesFrom.map((evo) => `${text(evo.from)} via ${text(joinParts([evo.method, evo.requirement, evo.conditions]))}`);
     return `
-      <article class="card pokemon-card">
+      <article class="card pokemon-card" data-species-card="${attr(entry.name)}">
         <div class="pokemon-head">
           ${sprite(entry)}
           <div class="pokemon-title">
@@ -431,34 +472,41 @@
           <button class="small-button caught-toggle ${caught ? "is-caught" : ""}" type="button" data-caught="${attr(entry.name)}">${caught ? "Caught" : "Mark caught"}</button>
         </div>
         <div class="stat-bars">${statBars(entry.stats)}</div>
-        <div class="chip-row">
-          ${entry.abilities.map((ability) => `<span class="chip">${text(ability)}</span>`).join("")}
+        <div class="dex-info-grid">
+          <div class="dex-info-cell">
+            <small>Profile</small>
+            <strong>Catch ${value(entry.catchRate)}</strong>
+            <span>EXP ${value(entry.expYield)} / ${text(entry.growthRate || "")}</span>
+          </div>
+          <div class="dex-info-cell">
+            <small>Egg groups</small>
+            <span>${text(entry.eggGroups.join(" / ") || "None listed")}</span>
+          </div>
+          <div class="dex-info-cell">
+            <small>Held items</small>
+            <span>${text(joinParts([
+              entry.heldItems.common && entry.heldItems.common !== "None" ? `Common: ${entry.heldItems.common}` : "",
+              entry.heldItems.rare && entry.heldItems.rare !== "None" ? `Rare: ${entry.heldItems.rare}` : "",
+            ]) || "None listed")}</span>
+          </div>
         </div>
-        ${availability}
-        <div class="chip-row">
+        <section class="dex-card-section">
+          <h4>Abilities</h4>
+          <div class="chip-row">${entry.abilities.map((ability) => `<span class="chip">${text(ability)}</span>`).join("")}</div>
+        </section>
+        <section class="dex-card-section">
+          <h4>Evolution</h4>
+          ${renderEvolutionLinks(entry)}
+        </section>
+        <section class="dex-card-section">
+          <h4>Locations</h4>
+          ${availability}
+        </section>
+        <div class="dex-action-row">
           <button class="chip-button" type="button" data-add-team="${attr(entry.name)}">Add to team</button>
           <button class="chip-button" type="button" data-add-planner="${attr(entry.name)}">Plan</button>
+          <button class="chip-button primary-chip" type="button" data-open-moves="${attr(entry.name)}">Moves</button>
         </div>
-        <details>
-          <summary>Details</summary>
-          <div class="detail-block">
-            <div><h4>Profile</h4><p>${text(joinParts([
-              `Catch ${value(entry.catchRate)}`,
-              `EXP ${value(entry.expYield)}`,
-              entry.growthRate,
-              entry.eggGroups.join(" / "),
-            ]))}</p></div>
-            <div><h4>Held items</h4><p>${text(joinParts([
-              entry.heldItems.common ? `Common: ${entry.heldItems.common}` : "",
-              entry.heldItems.rare ? `Rare: ${entry.heldItems.rare}` : "",
-            ]) || "None listed")}</p></div>
-            <div><h4>Evolution</h4><p>${[...evoIn, ...evoOut].join("<br>") || "No evolution data listed."}</p></div>
-            <div><h4>Level moves</h4><p>${levelMoves || "None listed."}</p></div>
-            <div><h4>TM/HM moves</h4><p>${tmMoves || "None listed."}</p></div>
-            <div><h4>Tutor moves</h4><p>${tutorMoves || "None listed."}</p></div>
-            <div><h4>Egg moves</h4><p>${eggMoves || "None listed."}</p></div>
-          </div>
-        </details>
       </article>
     `;
   }
@@ -468,13 +516,157 @@
     const statics = entry.staticLocations;
     const pieces = [];
     if (wild.length) {
-      pieces.push(`<span class="chip">Wild: ${text(wild.slice(0, 4).join(", "))}${wild.length > 4 ? ` +${wild.length - 4}` : ""}</span>`);
+      pieces.push(renderLocationChipGroup("Wild", wild, 4));
     }
     if (statics.length) {
-      pieces.push(`<span class="chip">Static: ${text(statics.slice(0, 3).join(", "))}${statics.length > 3 ? ` +${statics.length - 3}` : ""}</span>`);
+      pieces.push(renderLocationChipGroup("Static", statics, 3));
     }
     if (!pieces.length) pieces.push('<span class="chip">No location listed</span>');
     return `<div class="chip-row">${pieces.join("")}</div>`;
+  }
+
+  function renderLocationChipGroup(label, locations, limit) {
+    const visible = locations.slice(0, limit);
+    const chips = visible
+      .map(
+        (location, index) => `
+          <button class="chip link-chip" type="button" data-jump-location="${attr(location)}">
+            ${index === 0 ? `${text(label)}: ` : ""}${text(location)}
+          </button>
+        `,
+      )
+      .join("");
+    const extra = locations.length > limit ? `<span class="chip">+${locations.length - limit}</span>` : "";
+    return `${chips}${extra}`;
+  }
+
+  function renderEvolutionLinks(entry) {
+    const links = [
+      ...entry.evolvesFrom.map((evo) => ({ direction: "From", target: evo.from, detail: joinParts([evo.method, evo.requirement, evo.conditions]) })),
+      ...entry.evolutions.map((evo) => ({ direction: "To", target: evo.to, detail: joinParts([evo.method, evo.requirement, evo.conditions]) })),
+    ];
+    if (!links.length) return '<span class="muted">No evolution data listed.</span>';
+    return `
+      <div class="evolution-links">
+        ${links
+          .map((link) => {
+            const target = speciesByName.get(link.target);
+            return `
+              <button class="evolution-link" type="button" data-jump-species="${attr(link.target)}">
+                ${miniSprite(target)}
+                <span><small>${text(link.direction)}</small><strong>${text(link.target)}</strong><em>${text(link.detail || "Evolution")}</em></span>
+              </button>
+            `;
+          })
+          .join("")}
+      </div>
+    `;
+  }
+
+  function openMovesModal(name) {
+    const entry = speciesByName.get(name);
+    if (!entry || !els.modalRoot) return;
+    const rows = collectLearnableMoves(entry);
+    els.modalRoot.innerHTML = `
+      <div class="modal-backdrop" data-close-modal></div>
+      <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="moves-modal-title">
+        <header class="modal-head">
+          <div>
+            <small class="muted">Learnset</small>
+            <h3 id="moves-modal-title">${text(entry.name)} Moves</h3>
+          </div>
+          <button class="icon-button" type="button" data-close-modal aria-label="Close moves modal">X</button>
+        </header>
+        <div class="modal-summary">
+          ${sprite(entry)}
+          <div>
+            <div class="type-row">${entry.types.map(typePill).join("")}</div>
+            <div class="chip-row">
+              <span class="chip">${rows.length} moves</span>
+              <span class="chip">${entry.learnsets.level.length} level</span>
+              <span class="chip">${entry.learnsets.tmhm.length} TM/HM</span>
+              <span class="chip">${entry.learnsets.tutor.length} tutor</span>
+              <span class="chip">${entry.learnsets.egg.length} egg</span>
+            </div>
+          </div>
+        </div>
+        <div class="table-wrap modal-table">
+          <table class="data-table move-modal-table">
+            <thead><tr><th>Move</th><th>Source</th><th>Type</th><th>Cat.</th><th>Power</th><th>Acc.</th><th>Effect</th></tr></thead>
+            <tbody>
+              ${rows.map(renderMoveModalRow).join("")}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    `;
+    document.body.classList.add("modal-open");
+  }
+
+  function renderMoveModalRow(row) {
+    const move = row.move;
+    return `
+      <tr>
+        <td><button class="table-link" type="button" data-jump-move="${attr(move.name)}">${text(move.name)}</button></td>
+        <td><div class="source-chip-row">${row.sources.map((source) => renderMoveSourceChip(move.name, source)).join("")}</div></td>
+        <td>${typePill(move.type)}</td>
+        <td>${text(effectiveCategory(move))}</td>
+        <td>${value(move.power)}</td>
+        <td>${value(move.accuracy)}</td>
+        <td>${text(joinParts([move.effect, move.flags]) || "No additional effect listed.")}</td>
+      </tr>
+    `;
+  }
+
+  function renderMoveSourceChip(moveName, source) {
+    if (source.kind === "tmhm") {
+      const item = (itemsByMove.get(moveName) || []).find((entry) => entry.type === "TM" || entry.type === "HM");
+      if (item) {
+        return `<button class="chip link-chip" type="button" data-jump-item="${attr(item.name)}">${text(item.name)}</button>`;
+      }
+      return '<span class="chip">TM/HM</span>';
+    }
+    if (source.kind === "tutor") {
+      const tutor = tutorsByMove.get(moveName);
+      const label = tutor ? `Tutor: ${joinParts([tutor.location, tutor.cost])}` : "Tutor";
+      return `<button class="chip link-chip" type="button" data-jump-move="${attr(moveName)}">${text(label)}</button>`;
+    }
+    return `<span class="chip">${text(source.label)}</span>`;
+  }
+
+  function collectLearnableMoves(entry) {
+    const rows = new Map();
+    const add = (moveName, source) => {
+      const move = moveByName.get(moveName);
+      if (!move) return;
+      const row = rows.get(move.name) || { move, sources: [] };
+      if (!row.sources.some((item) => item.label === source.label)) row.sources.push(source);
+      rows.set(move.name, row);
+    };
+    entry.learnsets.level.forEach((item) => add(item.move, { kind: "level", label: item.level ? `Lv ${item.level}` : "Level" }));
+    entry.learnsets.tmhm.forEach((move) => add(move, { kind: "tmhm", label: "TM/HM" }));
+    entry.learnsets.tutor.forEach((move) => add(move, { kind: "tutor", label: "Tutor" }));
+    entry.learnsets.egg.forEach((move) => add(move, { kind: "egg", label: "Egg" }));
+    return [...rows.values()].sort(
+      (a, b) => sourceSort(a.sources[0]) - sourceSort(b.sources[0]) || a.move.name.localeCompare(b.move.name),
+    );
+  }
+
+  function sourceSort(source) {
+    if (source.kind === "level") {
+      const level = Number(String(source.label).replace(/[^0-9]/g, ""));
+      return Number.isFinite(level) && level > 0 ? level : 0;
+    }
+    if (source.kind === "tmhm") return 200;
+    if (source.kind === "tutor") return 300;
+    if (source.kind === "egg") return 400;
+    return 500;
+  }
+
+  function closeModal() {
+    if (!els.modalRoot?.innerHTML) return;
+    els.modalRoot.innerHTML = "";
+    document.body.classList.remove("modal-open");
   }
 
   function renderLocations() {
@@ -498,7 +690,7 @@
 
   function renderLocationCard(location) {
     return `
-      <article class="location-card">
+      <article class="location-card" data-location-card="${attr(location.name)}">
         <header>
           <h3>${text(location.name)}</h3>
           <span class="chip">${value(location.speciesCount)} species</span>
@@ -552,7 +744,7 @@
                 <tr>
                   <td><strong>${text(item.name)}</strong>${item.notes ? `<br><small>${text(item.notes)}</small>` : ""}</td>
                   <td>${text(item.type)}</td>
-                  <td>${text(item.move || "")}</td>
+                  <td>${item.move ? `<button class="table-link" type="button" data-jump-move="${attr(item.move)}">${text(item.move)}</button>` : ""}</td>
                   <td>${text(item.locations || "")}</td>
                   <td>${heldSpecies(item)}</td>
                 </tr>
@@ -1123,6 +1315,45 @@
     showView("planner");
   }
 
+  function jumpToSpecies(name) {
+    if (!speciesByName.has(name)) return;
+    closeModal();
+    filters.dexSearch = name;
+    filters.dexType = "";
+    filters.dexAvailability = "";
+    filters.dexCaughtOnly = false;
+    renderControls();
+    renderDex();
+    showView("dex");
+  }
+
+  function jumpToLocation(name) {
+    closeModal();
+    filters.locationSearch = name;
+    renderControls();
+    renderLocations();
+    showView("locations");
+  }
+
+  function jumpToItem(search) {
+    closeModal();
+    filters.itemSearch = search;
+    filters.itemType = "";
+    renderControls();
+    renderItems();
+    showView("items");
+  }
+
+  function jumpToMove(name) {
+    closeModal();
+    filters.moveSearch = name;
+    filters.moveType = "";
+    filters.moveCategory = "";
+    renderControls();
+    renderMoves();
+    showView("moves");
+  }
+
   function planTrainerBattle(trainerId) {
     const trainer = trainersById.get(trainerId);
     if (!trainer) return;
@@ -1648,6 +1879,14 @@
       return `<div class="sprite-box"><img src="${attr(entry.sprite)}" alt="${attr(entry.name)} sprite" loading="lazy" /></div>`;
     }
     return `<div class="sprite-box"><span class="sprite-fallback">${text(entry.name.slice(0, 2).toUpperCase())}</span></div>`;
+  }
+
+  function miniSprite(entry) {
+    if (entry?.sprite) {
+      return `<span class="mini-sprite"><img src="${attr(entry.sprite)}" alt="" loading="lazy" /></span>`;
+    }
+    const label = entry?.name || "?";
+    return `<span class="mini-sprite"><span>${text(label.slice(0, 2).toUpperCase())}</span></span>`;
   }
 
   function typePill(type) {
