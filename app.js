@@ -66,6 +66,10 @@
     Mystery: "#6a7a8a",
   };
   const gen3SpecialTypes = new Set(["Fire", "Water", "Grass", "Electric", "Ice", "Psychic", "Dragon", "Dark"]);
+  const dexBatchSize = 50;
+  let dexVisibleCount = dexBatchSize;
+  let dexFilteredCount = species.length;
+  let currentViewId = "dex";
 
   const state = loadState();
   const filters = {
@@ -150,6 +154,11 @@
         return;
       }
 
+      if (event.target.closest("#jump-top")) {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+
       const caughtButton = event.target.closest("[data-caught]");
       if (caughtButton) {
         const name = caughtButton.dataset.caught;
@@ -214,6 +223,17 @@
         return;
       }
 
+      if (event.target.closest("[data-load-more-dex]")) {
+        loadMoreDex();
+        return;
+      }
+
+      const moveSectionButton = event.target.closest("[data-move-sections]");
+      if (moveSectionButton) {
+        setMoveSectionsOpen(moveSectionButton.dataset.moveSections === "expand");
+        return;
+      }
+
       const clearTeam = event.target.closest("[data-clear-team]");
       if (clearTeam) {
         state.team[Number(clearTeam.dataset.clearTeam)] = blankTeamSlot();
@@ -271,6 +291,9 @@
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape") closeModal();
     });
+    if (window.addEventListener) {
+      window.addEventListener("scroll", handleScroll, { passive: true });
+    }
 
     els.themeToggle.addEventListener("click", () => {
       state.theme = state.theme === "dark" ? "light" : "dark";
@@ -283,6 +306,7 @@
     const target = event.target;
     if (target.matches("#dex-search")) {
       filters.dexSearch = target.value;
+      resetDexLimit();
       renderDex();
     } else if (target.matches("#location-search")) {
       filters.locationSearch = target.value;
@@ -307,12 +331,15 @@
     const target = event.target;
     if (target.matches("#dex-type")) {
       filters.dexType = target.value;
+      resetDexLimit();
       renderDex();
     } else if (target.matches("#dex-availability")) {
       filters.dexAvailability = target.value;
+      resetDexLimit();
       renderDex();
     } else if (target.matches("#dex-caught-only")) {
       filters.dexCaughtOnly = target.checked;
+      resetDexLimit();
       renderDex();
     } else if (target.matches("#item-type")) {
       filters.itemType = target.value;
@@ -401,7 +428,7 @@
         ${option("static", "Static, gift, trade")}
         ${option("none", "No location listed")}
       </select></label>
-      <label class="rule-toggle"><input id="dex-caught-only" type="checkbox" ${filters.dexCaughtOnly ? "checked" : ""} /> Caught only</label>
+      <label class="field checkbox-field"><span>Progress</span><span class="check-control"><input id="dex-caught-only" type="checkbox" ${filters.dexCaughtOnly ? "checked" : ""} /> Caught only</span></label>
     `;
     els.locationControls.innerHTML = `
       <label class="field grow"><span>Search</span><input id="location-search" type="search" placeholder="Location, Pokemon, method, time" value="${attr(filters.locationSearch)}" /></label>
@@ -450,13 +477,20 @@
         (!filters.dexCaughtOnly || state.caught[entry.name])
       );
     });
-    els.dexCount.textContent = `Showing ${filtered.length} of ${species.length}`;
-    els.dexGrid.innerHTML = filtered.map(renderDexCard).join("") || empty("No Pokemon match those filters.");
+    dexFilteredCount = filtered.length;
+    const visible = filtered.slice(0, dexVisibleCount);
+    els.dexCount.textContent = `Showing ${visible.length} of ${filtered.length}`;
+    els.dexGrid.innerHTML =
+      visible.map(renderDexCard).join("") +
+        (filtered.length > visible.length
+          ? `<div class="load-more-card"><button class="button" type="button" data-load-more-dex>Load more</button><span class="muted">${filtered.length - visible.length} remaining</span></div>`
+          : "") || empty("No Pokemon match those filters.");
   }
 
   function renderDexCard(entry) {
     const caught = Boolean(state.caught[entry.name]);
     const availability = renderAvailability(entry);
+    const abilities = displayAbilities(entry);
     return `
       <article class="card pokemon-card" data-species-card="${attr(entry.name)}">
         <div class="pokemon-head">
@@ -472,27 +506,9 @@
           <button class="small-button caught-toggle ${caught ? "is-caught" : ""}" type="button" data-caught="${attr(entry.name)}">${caught ? "Caught" : "Mark caught"}</button>
         </div>
         <div class="stat-bars">${statBars(entry.stats)}</div>
-        <div class="dex-info-grid">
-          <div class="dex-info-cell">
-            <small>Profile</small>
-            <strong>Catch ${value(entry.catchRate)}</strong>
-            <span>EXP ${value(entry.expYield)} / ${text(entry.growthRate || "")}</span>
-          </div>
-          <div class="dex-info-cell">
-            <small>Egg groups</small>
-            <span>${text(entry.eggGroups.join(" / ") || "None listed")}</span>
-          </div>
-          <div class="dex-info-cell">
-            <small>Held items</small>
-            <span>${text(joinParts([
-              entry.heldItems.common && entry.heldItems.common !== "None" ? `Common: ${entry.heldItems.common}` : "",
-              entry.heldItems.rare && entry.heldItems.rare !== "None" ? `Rare: ${entry.heldItems.rare}` : "",
-            ]) || "None listed")}</span>
-          </div>
-        </div>
         <section class="dex-card-section">
           <h4>Abilities</h4>
-          <div class="chip-row">${entry.abilities.map((ability) => `<span class="chip">${text(ability)}</span>`).join("")}</div>
+          <div class="chip-row">${abilities.length ? abilities.map((ability) => `<span class="chip">${text(ability)}</span>`).join("") : '<span class="chip">No ability listed</span>'}</div>
         </section>
         <section class="dex-card-section">
           <h4>Evolution</h4>
@@ -509,6 +525,39 @@
         </div>
       </article>
     `;
+  }
+
+  function displayAbilities(entry) {
+    const abilities = unique(entry.abilities).filter(Boolean);
+    const realAbilities = abilities.filter((ability) => normalize(ability) !== "none");
+    if (realAbilities.length) return realAbilities;
+    return abilities.length === 1 ? abilities : [];
+  }
+
+  function resetDexLimit() {
+    dexVisibleCount = dexBatchSize;
+  }
+
+  function loadMoreDex() {
+    if (dexVisibleCount >= dexFilteredCount) return;
+    dexVisibleCount = Math.min(dexVisibleCount + dexBatchSize, dexFilteredCount);
+    renderDex();
+  }
+
+  function handleScroll() {
+    updateJumpTop();
+    if (currentViewId !== "dex" || dexVisibleCount >= dexFilteredCount) return;
+    const scrollTop = window.scrollY || document.documentElement.scrollTop || 0;
+    const viewport = window.innerHeight || document.documentElement.clientHeight || 0;
+    const pageHeight = document.documentElement.scrollHeight || 0;
+    if (scrollTop + viewport >= pageHeight - 700) loadMoreDex();
+  }
+
+  function updateJumpTop() {
+    const button = document.querySelector("#jump-top");
+    if (!button) return;
+    const scrollTop = window.scrollY || document.documentElement.scrollTop || 0;
+    button.classList.toggle("is-visible", scrollTop > 500);
   }
 
   function renderAvailability(entry) {
@@ -758,38 +807,104 @@
 
   function renderMoves() {
     const query = normalize(filters.moveSearch);
-    const filtered = data.moves.filter((move) => {
+    const tutorMoveNames = new Set(data.tutors.map((tutor) => tutor.move));
+    const filteredMoves = data.moves.filter((move) => {
       const displayCategory = effectiveCategory(move);
       const haystack = normalize([move.name, move.effect, move.flags, displayCategory, move.type].join(" "));
       return (
         (!query || haystack.includes(query)) &&
         (!filters.moveType || move.type === filters.moveType) &&
+        (!filters.moveCategory || displayCategory === filters.moveCategory) &&
+        !tutorMoveNames.has(move.name)
+      );
+    });
+    const filteredTutors = data.tutors.filter((tutor) => {
+      const move = moveByName.get(tutor.move);
+      const displayCategory = effectiveCategory(move);
+      const haystack = normalize([tutor.move, tutor.location, tutor.cost, move?.effect, move?.flags, displayCategory, move?.type].join(" "));
+      return (
+        (!query || haystack.includes(query)) &&
+        (!filters.moveType || move?.type === filters.moveType) &&
         (!filters.moveCategory || displayCategory === filters.moveCategory)
       );
     });
-    els.moveCount.textContent = `Showing ${filtered.length} of ${data.moves.length}`;
+    els.moveCount.textContent = `Showing ${filteredMoves.length} moves and ${filteredTutors.length} tutors`;
     els.moveTable.innerHTML = `
-      <table class="data-table">
-        <thead><tr><th>Move</th><th>Type</th><th>Cat.</th><th>Power</th><th>Acc.</th><th>PP</th><th>Effect</th></tr></thead>
-        <tbody>
-          ${filtered
-            .map(
-              (move) => `
-                <tr>
-                  <td><strong>${text(move.name)}</strong></td>
-                  <td>${typePill(move.type)}</td>
-                  <td>${text(effectiveCategory(move))}</td>
-                  <td>${value(move.power)}</td>
-                  <td>${value(move.accuracy)}</td>
-                  <td>${value(move.pp)}</td>
-                  <td>${text(joinParts([move.effect, move.flags]))}</td>
-                </tr>
-              `,
-            )
-            .join("")}
-        </tbody>
-      </table>
+      <div class="move-section-actions">
+        <button class="small-button" type="button" data-move-sections="expand">Expand all</button>
+        <button class="small-button" type="button" data-move-sections="collapse">Collapse all</button>
+      </div>
+      <details class="move-section" data-move-section>
+        <summary><span>Move catalogue</span><span class="chip">${filteredMoves.length}</span></summary>
+        ${renderMoveCatalogueTable(filteredMoves)}
+      </details>
+      <details class="move-section" data-move-section>
+        <summary><span>Tutor moves</span><span class="chip">${filteredTutors.length}</span></summary>
+        ${renderTutorMoveTable(filteredTutors)}
+      </details>
     `;
+  }
+
+  function renderMoveCatalogueTable(rows) {
+    if (!rows.length) return empty("No moves match those filters.");
+    return `
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Move</th><th>Type</th><th>Cat.</th><th>Power</th><th>Acc.</th><th>PP</th><th>Effect</th></tr></thead>
+          <tbody>${rows.map(renderMoveTableRow).join("")}</tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  function renderTutorMoveTable(rows) {
+    if (!rows.length) return empty("No tutor moves match those filters.");
+    return `
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Move</th><th>Type</th><th>Cat.</th><th>Power</th><th>Acc.</th><th>Location</th><th>Requirement</th><th>Effect</th></tr></thead>
+          <tbody>
+            ${rows
+              .map((tutor) => {
+                const move = moveByName.get(tutor.move);
+                return `
+                  <tr>
+                    <td><button class="table-link" type="button" data-jump-move="${attr(tutor.move)}">${text(tutor.move)}</button></td>
+                    <td>${move ? typePill(move.type) : ""}</td>
+                    <td>${text(effectiveCategory(move))}</td>
+                    <td>${value(move?.power)}</td>
+                    <td>${value(move?.accuracy)}</td>
+                    <td>${text(tutor.location || "Unknown")}</td>
+                    <td>${text(tutor.cost || "None listed")}</td>
+                    <td>${text(joinParts([move?.effect, move?.flags]) || "No additional effect listed.")}</td>
+                  </tr>
+                `;
+              })
+              .join("")}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  function renderMoveTableRow(move) {
+    return `
+      <tr>
+        <td><strong>${text(move.name)}</strong></td>
+        <td>${typePill(move.type)}</td>
+        <td>${text(effectiveCategory(move))}</td>
+        <td>${value(move.power)}</td>
+        <td>${value(move.accuracy)}</td>
+        <td>${value(move.pp)}</td>
+        <td>${text(joinParts([move.effect, move.flags]))}</td>
+      </tr>
+    `;
+  }
+
+  function setMoveSectionsOpen(open) {
+    document.querySelectorAll("[data-move-section]").forEach((section) => {
+      section.open = open;
+    });
   }
 
   function renderTrainers() {
@@ -1276,10 +1391,12 @@
 
   function showView(viewId) {
     if (!viewId) return;
+    currentViewId = viewId;
     els.tabs.forEach((tab) => tab.classList.toggle("is-active", tab.dataset.view === viewId));
     els.views.forEach((view) => view.classList.toggle("is-active", view.id === `view-${viewId}`));
     history.replaceState(null, "", `#${viewId}`);
     window.scrollTo({ top: 0, behavior: "smooth" });
+    updateJumpTop();
   }
 
   function updateCounts() {
@@ -1322,6 +1439,7 @@
     filters.dexType = "";
     filters.dexAvailability = "";
     filters.dexCaughtOnly = false;
+    resetDexLimit();
     renderControls();
     renderDex();
     showView("dex");
@@ -1351,6 +1469,7 @@
     filters.moveCategory = "";
     renderControls();
     renderMoves();
+    setMoveSectionsOpen(true);
     showView("moves");
   }
 

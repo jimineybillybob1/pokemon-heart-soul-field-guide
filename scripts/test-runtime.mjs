@@ -167,12 +167,19 @@ const checks = {
   speciesStat: defaultApp.elementFor("#stat-species").textContent,
   locationStat: defaultApp.elementFor("#stat-locations").textContent,
   dexCardsRendered: defaultApp.elementFor("#dex-grid").innerHTML.includes("Bulbasaur"),
+  dexInitialCardCount: (defaultApp.elementFor("#dex-grid").innerHTML.match(/data-species-card=/g) || []).length,
   dexCardsHaveMovesButton: defaultApp.elementFor("#dex-grid").innerHTML.includes("data-open-moves"),
   dexCardsDoNotUseDetailsPane: !defaultApp.elementFor("#dex-grid").innerHTML.includes("<details"),
+  dexCardsDoNotUseProfileBlocks: !defaultApp.elementFor("#dex-grid").innerHTML.includes("Profile"),
+  dexCardsHideNoneAbilities: !defaultApp.elementFor("#dex-grid").innerHTML.includes(">None</span>"),
   movesModalRendered:
     defaultApp.elementFor("#modal-root").innerHTML.includes("Bulbasaur Moves") &&
     defaultApp.elementFor("#modal-root").innerHTML.includes("Vine Whip") &&
     defaultApp.elementFor("#modal-root").innerHTML.includes("data-jump-item"),
+  movesTabHasTutorSection:
+    defaultApp.elementFor("#move-table").innerHTML.includes("Tutor moves") &&
+    defaultApp.elementFor("#move-table").innerHTML.includes("Requirement") &&
+    defaultApp.elementFor("#move-table").innerHTML.includes("data-move-sections=\"expand\""),
   trainerPlanButtonsRendered: defaultApp.elementFor("#trainer-list").innerHTML.includes("Plan this trainer"),
   teamSlotsRendered: (defaultApp.elementFor("#team-grid").innerHTML.match(/Slot /g) || []).length,
   customBattlePlannerRendered: defaultApp.elementFor("#battle-targets").innerHTML.includes("Custom targets"),
@@ -191,9 +198,13 @@ if (
   String(checks.speciesStat) !== "423" ||
   String(checks.locationStat) !== "144" ||
   !checks.dexCardsRendered ||
+  checks.dexInitialCardCount !== 50 ||
   !checks.dexCardsHaveMovesButton ||
   !checks.dexCardsDoNotUseDetailsPane ||
+  !checks.dexCardsDoNotUseProfileBlocks ||
+  !checks.dexCardsHideNoneAbilities ||
   !checks.movesModalRendered ||
+  !checks.movesTabHasTutorSection ||
   !checks.trainerPlanButtonsRendered ||
   checks.teamSlotsRendered !== 6 ||
   !checks.customBattlePlannerRendered ||

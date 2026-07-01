@@ -330,7 +330,30 @@ img {
   flex: 1 1 280px;
 }
 
-.field span {
+.checkbox-field {
+  min-width: 150px;
+}
+
+.check-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.check-control input {
+  width: auto;
+  min-height: 0;
+  margin: 0;
+}
+
+.field > span {
   color: var(--muted);
   font-size: 0.78rem;
   font-weight: 800;
@@ -392,7 +415,6 @@ textarea {
   grid-template-columns: 76px minmax(0, 1fr);
   gap: 12px;
   align-items: center;
-  position: relative;
 }
 
 .sprite-box {
@@ -434,7 +456,6 @@ textarea {
 }
 
 .pokemon-title h3 {
-  padding-right: 108px;
   font-size: 1.22rem;
 }
 
@@ -513,10 +534,9 @@ textarea {
 }
 
 .caught-toggle {
-  position: absolute;
-  top: 50%;
-  right: 0;
-  transform: translateY(-50%);
+  grid-column: 2;
+  justify-self: start;
+  align-self: start;
 }
 
 .caught-toggle.is-caught {
@@ -555,36 +575,12 @@ textarea {
   background: linear-gradient(90deg, var(--accent-2), var(--gold));
 }
 
-.dex-info-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.dex-info-cell {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-  padding: 9px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: color-mix(in srgb, var(--surface-2) 72%, var(--surface));
-}
-
-.dex-info-cell small,
 .dex-card-section h4 {
   color: var(--muted);
   font-size: 0.68rem;
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-}
-
-.dex-info-cell strong,
-.dex-info-cell span {
-  min-width: 0;
-  font-size: 0.82rem;
-  line-height: 1.25;
 }
 
 .dex-card-section {
@@ -692,6 +688,18 @@ textarea {
   text-align: left;
 }
 
+.load-more-card {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  padding: 18px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--surface) 78%, var(--surface-2));
+}
+
 details {
   border-top: 1px solid var(--line);
   padding-top: 10px;
@@ -791,6 +799,46 @@ summary {
 
 .data-table tr:hover td {
   background: color-mix(in srgb, var(--accent-3) 8%, transparent);
+}
+
+.move-section-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.move-section {
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.move-section + .move-section {
+  margin-top: 12px;
+}
+
+.move-section summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 54px;
+  padding: 0 14px;
+  border-bottom: 1px solid transparent;
+}
+
+.move-section[open] summary {
+  border-bottom-color: var(--line);
+}
+
+.move-section .table-wrap {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .trainer-team {
@@ -1198,16 +1246,40 @@ summary {
   border: 0;
 }
 
+.jump-top {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 35;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  font-weight: 900;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(8px);
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease;
+}
+
+.jump-top.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
 @media (max-width: 900px) {
   .hero,
   .dashboard,
   .battle-layout,
   .save-layout,
   .threat-columns {
-    grid-template-columns: 1fr;
-  }
-
-  .dex-info-grid {
     grid-template-columns: 1fr;
   }
 
