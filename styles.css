@@ -1212,8 +1212,75 @@ summary {
 
 .team-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
+}
+
+.team-offense-summary {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.team-offense-summary header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.team-offense-summary h3,
+.team-offense-summary p {
+  margin: 0;
+}
+
+.coverage-type-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(108px, 1fr));
+  gap: 8px;
+}
+
+.coverage-type {
+  --type-color: var(--accent-3);
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  min-height: 48px;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.coverage-type strong,
+.coverage-type small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.coverage-type.is-covered {
+  border-color: color-mix(in srgb, var(--type-color) 74%, var(--line));
+  background: color-mix(in srgb, var(--type-color) 14%, var(--surface));
+}
+
+.coverage-type.is-covered strong {
+  color: var(--type-color);
+}
+
+.coverage-type.is-missing {
+  opacity: 0.72;
+}
+
+.coverage-type small {
+  color: var(--muted);
+  font-weight: 800;
 }
 
 .slot-card {
@@ -1267,6 +1334,44 @@ summary {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+}
+
+.move-field {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.team-move-summary {
+  min-height: 78px;
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.team-move-summary.is-empty {
+  place-items: center;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.team-move-summary p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.team-move-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
 }
 
 .slot-preview {
@@ -1949,6 +2054,12 @@ summary {
 
   .hero-media {
     min-height: 120px;
+  }
+}
+
+@media (max-width: 840px) {
+  .team-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

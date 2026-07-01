@@ -15,7 +15,7 @@
   const syncDeviceKey = "heart-soul-field-guide-sync-device-v1";
   const syncEndpoint = (window.HEART_SOUL_SYNC_ENDPOINT || "").replace(/\/+$/, "");
   const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  const appShellVersion = "heart-soul-field-guide-v5";
+  const appShellVersion = "heart-soul-field-guide-v6";
   const species = [...data.species].sort((a, b) => Number(a.dex || 0) - Number(b.dex || 0));
   const speciesByName = new Map(species.map((entry) => [entry.name, entry]));
   const moveByName = new Map(data.moves.map((move) => [move.name, move]));
@@ -523,6 +523,10 @@
       persist();
       renderTeamOverview();
       renderSave();
+    } else if (target.matches("[data-team-item]") && target.value === "") {
+      const index = Number(target.dataset.teamItem);
+      state.team[index].item = "";
+      persistAndRenderTeam();
     } else if (target.matches("[data-planner-note]")) {
       const index = Number(target.dataset.plannerNote);
       state.planner[index].note = target.value;
@@ -609,9 +613,7 @@
       const index = Number(target.dataset.teamSlot);
       const moveIndex = Number(target.dataset.teamMove);
       state.team[index].moves[moveIndex] = target.value;
-      persist();
-      renderBattlePlanner();
-      renderSave();
+      persistAndRenderTeam();
     } else if (target.matches("[data-planner-species]")) {
       const index = Number(target.dataset.plannerSpecies);
       state.planner[index].species = target.value;
@@ -1398,6 +1400,8 @@
   function renderTeam() {
     els.teamGrid.innerHTML = `
       <datalist id="team-species-list">${species.map((entry) => `<option value="${attr(entry.name)}"></option>`).join("")}</datalist>
+      <datalist id="team-item-list">${data.items.map((item) => `<option value="${attr(item.name)}"></option>`).join("")}</datalist>
+      ${renderTeamOffensiveSummary()}
       ${state.team.map((slot, index) => renderTeamSlot(slot, index)).join("")}
     `;
     renderTeamOverview();
@@ -1407,10 +1411,7 @@
     const entry = speciesByName.get(slot.species);
     const moveChoices = entry ? compatibleMoves(entry) : [];
     const item = itemsByName.get(slot.item);
-    const abilityOptions = [
-      option("", "Ability"),
-      ...(entry ? displayAbilities(entry).map((ability) => option(ability.name, ability.hidden ? `${ability.name} (HA)` : ability.name, slot.ability === ability.name)) : []),
-    ].join("");
+    const abilityOptions = teamAbilityOptions(entry, slot.ability);
     return `
       <article class="slot-card">
         <header>
@@ -1428,7 +1429,7 @@
             <label class="field"><span>Nickname</span><input data-team-nickname="${index}" value="${attr(slot.nickname || "")}" maxlength="32" placeholder="Optional nickname" /></label>
             <label class="field"><span>Nature</span><select data-team-nature="${index}">${natureOptions(slot.nature)}</select></label>
             <label class="field"><span>Ability</span><select data-team-ability="${index}" ${entry ? "" : "disabled"}>${abilityOptions}</select></label>
-            <label class="field team-item-field"><span>Held item</span><select data-team-item="${index}">${itemOptions(slot.item)}</select></label>
+            <label class="field team-item-field"><span>Held item</span><input data-team-item="${index}" list="team-item-list" value="${attr(slot.item || "")}" placeholder="Search held item" autocomplete="off" /></label>
           </div>
           ${renderTeamItemSummary(item)}
           ${entry ? renderTeamStats(entry, slot.nature) : ""}
@@ -1437,15 +1438,42 @@
             ${[0, 1, 2, 3]
               .map(
                 (moveIndex) => `
-                  <label class="field"><span>Move ${moveIndex + 1}</span><select data-team-slot="${index}" data-team-move="${moveIndex}">
-                    ${moveSelect(moveChoices, slot.moves[moveIndex])}
-                  </select></label>
+                  <div class="move-field">
+                    <label class="field"><span>Move ${moveIndex + 1}</span><select data-team-slot="${index}" data-team-move="${moveIndex}">
+                      ${moveSelect(moveChoices, slot.moves[moveIndex])}
+                    </select></label>
+                    ${renderTeamMoveSummary(slot.moves[moveIndex])}
+                  </div>
                 `,
               )
               .join("")}
           </div>
         </div>
       </article>
+    `;
+  }
+
+  function renderTeamOffensiveSummary() {
+    const moves = selectedTeamMoveChoices().map((choice) => choice.move);
+    const covered = new Set(moves.map((move) => move.type).filter(Boolean));
+    return `
+      <section class="team-offense-summary">
+        <header>
+          <div>
+            <h3>Offensive Coverage</h3>
+            <p class="muted">${moves.length ? `${moves.length} damaging moves selected` : "Select damage-dealing moves to build coverage."}</p>
+          </div>
+          <span class="chip">${covered.size} / ${typeNames.length} types</span>
+        </header>
+        <div class="coverage-type-grid">
+          ${typeNames
+            .map((type) => {
+              const count = moves.filter((move) => move.type === type).length;
+              return `<span class="coverage-type ${count ? "is-covered" : "is-missing"}" style="--type-color:${typeColors[type] || typeColors.Mystery}"><strong>${text(type)}</strong><small>${count ? `${count} move${count === 1 ? "" : "s"}` : "Missing"}</small></span>`;
+            })
+            .join("")}
+        </div>
+      </section>
     `;
   }
 
@@ -1476,18 +1504,17 @@
     ].join("");
   }
 
-  function itemOptions(selected) {
-    return [option("", "No held item"), ...data.items.map((item) => option(item.name, item.name, selected === item.name))].join("");
+  function teamAbilityOptions(entry, selected) {
+    if (!entry) return option("", "Choose Pokemon first");
+    const abilities = displayAbilities(entry);
+    if (!abilities.length) return option("", "No ability listed");
+    const selectedAbility = abilities.some((ability) => ability.name === selected) ? selected : defaultAbility(entry);
+    return abilities.map((ability) => option(ability.name, ability.hidden ? `${ability.name} (HA)` : ability.name, selectedAbility === ability.name)).join("");
   }
 
   function renderTeamItemSummary(item) {
     if (!item) return '<div class="held-item-summary is-empty"><span class="muted">No held item selected.</span></div>';
-    const details = joinParts([
-      item.notes,
-      item.move ? `Teaches ${item.move}` : "",
-      item.locations ? `Found: ${item.locations}` : "",
-      heldSpecies(item) ? `Wild hold: ${heldSpecies(item)}` : "",
-    ]);
+    const details = itemDescription(item);
     return `
       <div class="held-item-summary">
         ${itemIcon(item)}
@@ -1495,6 +1522,26 @@
           <strong>${text(item.name)}</strong>
           <small>${text(details || item.type)}</small>
         </div>
+      </div>
+    `;
+  }
+
+  function itemDescription(item) {
+    return joinParts([item.notes, item.move ? `Teaches ${item.move}` : ""]) || item.type || "No item description listed.";
+  }
+
+  function renderTeamMoveSummary(moveName) {
+    const move = moveByName.get(moveName);
+    if (!move) return '<div class="team-move-summary is-empty">No move selected.</div>';
+    return `
+      <div class="team-move-summary">
+        <div class="team-move-meta">
+          ${typePill(move.type)}
+          <span class="chip">${text(effectiveCategory(move))}</span>
+          <span class="chip">Power ${value(move.power)}</span>
+          <span class="chip">Acc ${value(move.accuracy)}</span>
+        </div>
+        <p>${text(joinParts([move.effect, move.flags]) || "No additional effect listed.")}</p>
       </div>
     `;
   }
@@ -1544,7 +1591,7 @@
               return `
                 <button class="evolve-button" type="button" data-evolve-team="${index}" data-evolve-to="${attr(target.name)}">
                   ${miniSprite(target)}
-                  <span><strong>Evolve to ${text(target.name)}</strong><small>${text(evolution.method || "Next evolution")}</small></span>
+                  <span><strong>Evolve to ${text(target.name)}</strong><small>${text(evolutionSummary(evolution))}</small></span>
                 </button>
               `;
             })
@@ -1552,6 +1599,33 @@
         </div>
       </section>
     `;
+  }
+
+  function evolutionSummary(evolution) {
+    const method = String(evolution.method || "").trim();
+    const requirement = evolution.requirement === null || typeof evolution.requirement === "undefined" ? "" : String(evolution.requirement).trim();
+    const conditions = String(evolution.conditions || "").trim();
+    const lowerMethod = normalize(method);
+    const lowerConditions = normalize(conditions);
+    let primary = method || "Evolution";
+    if (lowerMethod === "level" && requirement) primary = `Level ${requirement}`;
+    else if (lowerMethod === "item" && requirement) primary = `Use ${formatEvolutionRequirement(requirement)}`;
+    else if (requirement && !normalize(primary).includes(normalize(requirement))) primary = `${primary}: ${formatEvolutionRequirement(requirement)}`;
+    const extra = conditions && lowerConditions !== lowerMethod && lowerConditions !== normalize(requirement) ? conditions : "";
+    return joinParts([primary, extra]) || "Next evolution";
+  }
+
+  function formatEvolutionRequirement(value) {
+    const cleaned = String(value || "")
+      .replace(/^ITEM[_\s-]*/i, "")
+      .replace(/_/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!cleaned) return "";
+    return cleaned
+      .toLowerCase()
+      .replace(/\b\w/g, (letter) => letter.toUpperCase())
+      .replace(/\bHp\b/g, "HP");
   }
 
   function evolveTeamSlot(index, targetName) {

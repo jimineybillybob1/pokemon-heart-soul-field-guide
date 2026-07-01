@@ -149,7 +149,9 @@ const bossState = {
   rules: { fairy: true, physicalSplit: true },
   caught: {},
   team: Array.from({ length: 6 }, (_, index) =>
-    index === 0 ? { species: "Bulbasaur", ability: "Overgrow", moves: ["Tackle", "Vine Whip", "", ""] } : { species: "", ability: "", moves: ["", "", "", ""] },
+    index === 0
+      ? { species: "Bulbasaur", ability: "Overgrow", moves: ["Tackle", "Vine Whip", "", ""], nature: "Adamant", item: "Fire Stone", nickname: "Sprout" }
+      : { species: "", ability: "", moves: ["", "", "", ""], nature: "", item: "", nickname: "" },
   ),
   planner: Array.from({ length: 6 }, () => ({ species: "", note: "" })),
   battleMode: "trainer",
@@ -202,9 +204,20 @@ const checks = {
   teamSlotsRendered: (defaultApp.elementFor("#team-grid").innerHTML.match(/Slot /g) || []).length,
   teamBuilderEnhanced:
     defaultApp.elementFor("#team-grid").innerHTML.includes("list=\"team-species-list\"") &&
+    defaultApp.elementFor("#team-grid").innerHTML.includes("list=\"team-item-list\"") &&
     defaultApp.elementFor("#team-grid").innerHTML.includes("Nickname") &&
     defaultApp.elementFor("#team-grid").innerHTML.includes("Held item") &&
     defaultApp.elementFor("#team-grid").innerHTML.includes("Nature"),
+  teamBuilderDetails:
+    bossApp.elementFor("#team-grid").innerHTML.includes("Offensive Coverage") &&
+    bossApp.elementFor("#team-grid").innerHTML.includes("Grass") &&
+    bossApp.elementFor("#team-grid").innerHTML.includes("Missing") &&
+    bossApp.elementFor("#team-grid").innerHTML.includes("Level 16") &&
+    bossApp.elementFor("#team-grid").innerHTML.includes("Power") &&
+    bossApp.elementFor("#team-grid").innerHTML.includes("Acc") &&
+    bossApp.elementFor("#team-grid").innerHTML.includes("Fire Stone") &&
+    !bossApp.elementFor("#team-grid").innerHTML.includes("Found:") &&
+    !bossApp.elementFor("#team-grid").innerHTML.includes(">Ability</option>"),
   teamOverviewRendered: defaultApp.elementFor("#team-overview").innerHTML.includes("team-overview-slot"),
   teamRulesRemoved: !defaultApp.elementFor("#rules-panel").innerHTML.includes("Fairy type") && !defaultApp.elementFor("#rules-panel").innerHTML.includes("physical/special split"),
   customBattlePlannerRendered: defaultApp.elementFor("#battle-targets").innerHTML.includes("Custom targets"),
@@ -244,6 +257,7 @@ if (
   !checks.trainerSpritesRendered ||
   checks.teamSlotsRendered !== 6 ||
   !checks.teamBuilderEnhanced ||
+  !checks.teamBuilderDetails ||
   !checks.teamOverviewRendered ||
   !checks.teamRulesRemoved ||
   !checks.customBattlePlannerRendered ||
