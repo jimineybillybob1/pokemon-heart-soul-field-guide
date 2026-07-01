@@ -1,9 +1,10 @@
-const CACHE_NAME = "heart-soul-field-guide-v4";
+const CACHE_NAME = "heart-soul-field-guide-v5";
 const CORE_ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
+  "./sync-config.js",
   "./site.webmanifest",
   "./data/heart-soul-data.js",
   "./assets/art/heart-soul-logo.png",

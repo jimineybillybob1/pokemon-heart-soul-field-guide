@@ -1,0 +1,1 @@
+window.HEART_SOUL_SYNC_ENDPOINT = "";

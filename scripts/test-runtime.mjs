@@ -200,18 +200,25 @@ const checks = {
   trainerPlanButtonsRendered: defaultApp.elementFor("#trainer-list").innerHTML.includes("Plan this trainer"),
   trainerSpritesRendered: defaultApp.elementFor("#trainer-list").innerHTML.includes("trainer-avatar") && defaultApp.elementFor("#trainer-list").innerHTML.includes("mini-sprite"),
   teamSlotsRendered: (defaultApp.elementFor("#team-grid").innerHTML.match(/Slot /g) || []).length,
+  teamBuilderEnhanced:
+    defaultApp.elementFor("#team-grid").innerHTML.includes("list=\"team-species-list\"") &&
+    defaultApp.elementFor("#team-grid").innerHTML.includes("Nickname") &&
+    defaultApp.elementFor("#team-grid").innerHTML.includes("Held item") &&
+    defaultApp.elementFor("#team-grid").innerHTML.includes("Nature"),
+  teamOverviewRendered: defaultApp.elementFor("#team-overview").innerHTML.includes("team-overview-slot"),
   teamRulesRemoved: !defaultApp.elementFor("#rules-panel").innerHTML.includes("Fairy type") && !defaultApp.elementFor("#rules-panel").innerHTML.includes("physical/special split"),
   customBattlePlannerRendered: defaultApp.elementFor("#battle-targets").innerHTML.includes("Custom targets"),
   bossBattlePlannerRendered: bossApp.elementFor("#battle-targets").innerHTML.includes("Boss battle") && bossApp.elementFor("#battle-targets").innerHTML.includes(firstTrainer.name),
   bossBattleResultsRendered: bossApp.elementFor("#battle-results").innerHTML.includes("Offensive Answers") && bossApp.elementFor("#battle-results").innerHTML.includes("Defensive Threats"),
   saveRendered:
     defaultApp.elementFor("#save-panel").innerHTML.includes("Export save") &&
-    defaultApp.elementFor("#save-panel").innerHTML.includes("Sync Code") &&
+    defaultApp.elementFor("#save-panel").innerHTML.includes("Cloud Sync") &&
+    defaultApp.elementFor("#save-panel").innerHTML.includes("Private sync UUID") &&
     defaultApp.elementFor("#save-panel").innerHTML.includes("Device Status") &&
     defaultApp.elementFor("#save-panel").innerHTML.includes("Check latest") &&
     !defaultApp.elementFor("#save-panel").innerHTML.includes("Passphrase") &&
     defaultApp.elementFor("#save-panel").innerHTML.includes("Recovery"),
-  syncCodeCreated: syncApp.elementFor("#sync-code").value.startsWith("HNS2."),
+  syncCodeCreated: /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(syncApp.elementFor("#sync-code").value),
 };
 
 console.log(JSON.stringify(checks, null, 2));
@@ -236,6 +243,8 @@ if (
   !checks.trainerPlanButtonsRendered ||
   !checks.trainerSpritesRendered ||
   checks.teamSlotsRendered !== 6 ||
+  !checks.teamBuilderEnhanced ||
+  !checks.teamOverviewRendered ||
   !checks.teamRulesRemoved ||
   !checks.customBattlePlannerRendered ||
   !checks.bossBattlePlannerRendered ||

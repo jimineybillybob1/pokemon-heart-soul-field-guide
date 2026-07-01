@@ -251,6 +251,86 @@ img {
   font-weight: 700;
 }
 
+.team-overview {
+  width: min(var(--max), calc(100% - 32px));
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+  padding: 0 0 16px;
+}
+
+.team-overview-slot {
+  min-width: 0;
+  min-height: 112px;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background:
+    linear-gradient(180deg, rgba(17, 22, 29, 0.08), rgba(17, 22, 29, 0.22)),
+    url("assets/art/heart-soul-adventure.png") center / cover,
+    var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.team-overview-slot:not(.has-pokemon) {
+  background: var(--surface);
+}
+
+.team-overview-slot:hover {
+  border-color: var(--accent-3);
+}
+
+.team-overview-sprite {
+  display: grid;
+  place-items: center;
+  width: 66px;
+  height: 66px;
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+}
+
+.team-overview-sprite > span {
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.team-overview-sprite .sprite-box {
+  width: 64px;
+  height: 64px;
+  border: 0;
+  background: transparent;
+}
+
+.team-overview-sprite .sprite-box img {
+  width: 60px;
+  height: 60px;
+}
+
+.team-overview-slot strong,
+.team-overview-slot small {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.team-overview-slot strong {
+  font-size: 0.9rem;
+}
+
+.team-overview-slot small {
+  color: var(--muted);
+  font-weight: 800;
+}
+
 .tabs {
   width: min(var(--max), calc(100% - 32px));
   margin: 0 auto;
@@ -1132,7 +1212,7 @@ summary {
 
 .team-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
   gap: 12px;
 }
 
@@ -1155,10 +1235,32 @@ summary {
   min-width: 0;
 }
 
+.slot-card input,
 .slot-card select,
 .slot-card textarea {
   width: 100%;
   min-width: 0;
+}
+
+.team-field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.team-item-field {
+  grid-column: 1 / -1;
+}
+
+.slot-empty {
+  min-height: 92px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  color: var(--muted);
+  font-weight: 800;
+  text-align: center;
 }
 
 .move-grid {
@@ -1169,19 +1271,156 @@ summary {
 
 .slot-preview {
   display: grid;
-  grid-template-columns: 54px minmax(0, 1fr);
-  gap: 10px;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 12px;
   align-items: center;
 }
 
 .slot-preview .sprite-box {
-  width: 54px;
-  height: 54px;
+  width: 92px;
+  height: 92px;
 }
 
 .slot-preview .sprite-box img {
-  width: 48px;
-  height: 48px;
+  width: 84px;
+  height: 84px;
+}
+
+.slot-preview .muted {
+  display: block;
+  margin: 3px 0 5px;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.held-item-summary,
+.team-stat-panel,
+.slot-evolution {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.held-item-summary {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-height: 58px;
+  padding: 8px;
+}
+
+.held-item-summary.is-empty {
+  display: block;
+}
+
+.held-item-summary strong,
+.held-item-summary small {
+  display: block;
+  min-width: 0;
+}
+
+.held-item-summary small {
+  color: var(--muted);
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.team-stat-panel,
+.slot-evolution {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+}
+
+.team-stat-panel header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.team-stat-panel h4,
+.slot-evolution > span {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.team-stat-bars {
+  display: grid;
+  gap: 6px;
+}
+
+.team-stat-line {
+  display: grid;
+  grid-template-columns: 34px 32px 42px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  font-size: 0.82rem;
+}
+
+.team-stat-adjusted {
+  min-height: 22px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.team-stat-line.is-boosted .team-stat-adjusted {
+  color: var(--accent-2);
+  background: color-mix(in srgb, var(--accent-2) 14%, transparent);
+}
+
+.team-stat-line.is-lowered .team-stat-adjusted {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.evolve-options {
+  display: grid;
+  gap: 8px;
+}
+
+.evolve-button {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 9px;
+  align-items: center;
+  min-height: 56px;
+  padding: 7px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.evolve-button:hover {
+  border-color: var(--accent-3);
+}
+
+.evolve-button span {
+  min-width: 0;
+}
+
+.evolve-button strong,
+.evolve-button small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.evolve-button small {
+  color: var(--muted);
+  font-size: 0.74rem;
 }
 
 .battle-layout,
@@ -1357,6 +1596,80 @@ summary {
   gap: 10px;
 }
 
+.sync-service-status,
+.sync-freshness {
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.sync-service-status {
+  padding: 10px;
+  color: var(--muted);
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.sync-service-status[data-connected="true"] {
+  color: var(--accent-2);
+}
+
+.sync-freshness {
+  display: grid;
+  gap: 3px;
+  padding: 10px;
+}
+
+.sync-freshness small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.sync-freshness strong {
+  font-size: 1.05rem;
+}
+
+.sync-freshness p {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.sync-freshness[data-status="in-sync"] {
+  border-color: color-mix(in srgb, var(--accent-2) 70%, var(--line));
+}
+
+.sync-freshness[data-status="local-newer"],
+.sync-freshness[data-status="no-cloud"] {
+  border-color: color-mix(in srgb, var(--gold) 70%, var(--line));
+}
+
+.sync-freshness[data-status="cloud-newer"],
+.sync-freshness[data-status="conflict"],
+.sync-freshness[data-status="error"] {
+  border-color: color-mix(in srgb, var(--accent) 70%, var(--line));
+}
+
+.sync-conflict-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sync-conflict-actions[hidden] {
+  display: none;
+}
+
+.sync-recovery-list {
+  display: grid;
+  gap: 8px;
+}
+
 .status-grid {
   grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
 }
@@ -1382,8 +1695,7 @@ summary {
   letter-spacing: 0.06em;
 }
 
-.sync-code-area {
-  min-height: 118px;
+.sync-code-input {
   font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 0.82rem;
 }
@@ -1623,13 +1935,15 @@ summary {
 @media (max-width: 900px) {
   .hero,
   .dashboard,
+  .team-overview,
   .battle-layout,
   .save-layout,
   .threat-columns {
     grid-template-columns: 1fr;
   }
 
-  .dashboard {
+  .dashboard,
+  .team-overview {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -1642,6 +1956,7 @@ summary {
   .topbar,
   .hero,
   .dashboard,
+  .team-overview,
   .tabs,
   .app-main {
     width: min(var(--max), calc(100% - 20px));
@@ -1660,6 +1975,10 @@ summary {
 
   .dashboard {
     grid-template-columns: 1fr;
+  }
+
+  .team-overview {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .section-heading {
@@ -1681,6 +2000,14 @@ summary {
   }
 
   .move-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .team-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .team-field-grid {
     grid-template-columns: 1fr;
   }
 

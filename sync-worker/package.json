@@ -1,0 +1,8 @@
+{
+  "name": "heart-soul-field-guide-sync-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node --check src/index.js"
+  }
+}
