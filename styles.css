@@ -160,6 +160,13 @@ img {
   border-color: var(--accent-3);
 }
 
+.button:disabled,
+.small-button:disabled,
+.chip-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.56;
+}
+
 .hero {
   width: min(var(--max), calc(100% - 32px));
   margin: 0 auto;
@@ -878,6 +885,49 @@ summary {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.sync-grid,
+.backup-list {
+  display: grid;
+  gap: 10px;
+}
+
+.sync-code-area {
+  min-height: 118px;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.82rem;
+}
+
+.backup-entry {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.backup-entry strong,
+.backup-entry small {
+  display: block;
+}
+
+.save-status {
+  min-height: 22px;
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.save-status[data-status="success"] {
+  color: var(--accent-2);
+}
+
+.save-status[data-status="error"] {
+  color: var(--accent);
 }
 
 .notice {

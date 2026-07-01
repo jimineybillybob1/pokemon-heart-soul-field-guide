@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { webcrypto } from "node:crypto";
 import vm from "node:vm";
 
 const dataScript = fs.readFileSync("data/heart-soul-data.js", "utf8");
@@ -35,8 +36,9 @@ class FakeElement {
   }
 }
 
-function runApp(savedState = null) {
+function runApp(savedState = null, options = {}) {
   const selectors = new Map();
+  const listeners = {};
   const elementFor = (selector) => {
     if (!selectors.has(selector)) selectors.set(selector, new FakeElement(selector));
     return selectors.get(selector);
@@ -56,7 +58,9 @@ function runApp(savedState = null) {
   const document = {
     body: elementFor("body"),
     documentElement: elementFor("html"),
-    addEventListener() {},
+    addEventListener(type, handler) {
+      listeners[type] = handler;
+    },
     querySelector(selector) {
       return elementFor(selector);
     },
@@ -90,13 +94,45 @@ function runApp(savedState = null) {
     Blob,
     URL,
     console,
+    setTimeout,
   };
+  if (options.crypto) {
+    Object.assign(context, {
+      crypto: webcrypto,
+      TextEncoder,
+      TextDecoder,
+      btoa(value) {
+        return Buffer.from(value, "binary").toString("base64");
+      },
+      atob(value) {
+        return Buffer.from(value, "base64").toString("binary");
+      },
+      navigator: { clipboard: { writeText: async () => {} } },
+    });
+  }
   context.window = context;
 
   vm.createContext(context);
   vm.runInContext(dataScript, context, { filename: "data/heart-soul-data.js" });
   vm.runInContext(appScript, context, { filename: "app.js" });
-  return { context, elementFor };
+  return {
+    context,
+    elementFor,
+    click(selector) {
+      listeners.click?.({
+        target: {
+          closest(query) {
+            return query
+              .split(",")
+              .map((part) => part.trim())
+              .includes(selector)
+              ? elementFor(selector)
+              : null;
+          },
+        },
+      });
+    },
+  };
 }
 
 const defaultApp = runApp();
@@ -118,6 +154,10 @@ const bossState = {
   battleTargets: ["", ""],
 };
 const bossApp = runApp(bossState);
+const syncApp = runApp(null, { crypto: true });
+syncApp.elementFor("#sync-passphrase").value = "heart-soul-test";
+syncApp.click("#create-sync-code");
+await new Promise((resolve) => setTimeout(resolve, 100));
 
 const checks = {
   speciesStat: defaultApp.elementFor("#stat-species").textContent,
@@ -128,7 +168,11 @@ const checks = {
   customBattlePlannerRendered: defaultApp.elementFor("#battle-targets").innerHTML.includes("Custom targets"),
   bossBattlePlannerRendered: bossApp.elementFor("#battle-targets").innerHTML.includes("Boss battle") && bossApp.elementFor("#battle-targets").innerHTML.includes(firstTrainer.name),
   bossBattleResultsRendered: bossApp.elementFor("#battle-results").innerHTML.includes("Offensive Answers") && bossApp.elementFor("#battle-results").innerHTML.includes("Defensive Threats"),
-  saveRendered: defaultApp.elementFor("#save-panel").innerHTML.includes("Export save"),
+  saveRendered:
+    defaultApp.elementFor("#save-panel").innerHTML.includes("Export save") &&
+    defaultApp.elementFor("#save-panel").innerHTML.includes("Encrypted Sync") &&
+    defaultApp.elementFor("#save-panel").innerHTML.includes("Recovery"),
+  syncCodeCreated: syncApp.elementFor("#sync-code").value.startsWith("HNS1."),
 };
 
 console.log(JSON.stringify(checks, null, 2));
@@ -142,7 +186,8 @@ if (
   !checks.customBattlePlannerRendered ||
   !checks.bossBattlePlannerRendered ||
   !checks.bossBattleResultsRendered ||
-  !checks.saveRendered
+  !checks.saveRendered ||
+  !checks.syncCodeCreated
 ) {
   process.exit(1);
 }

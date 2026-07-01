@@ -39,10 +39,10 @@
 
       <section class="hero" aria-labelledby="hero-title">
         <div class="hero-copy">
-          <p class="eyebrow">MVP field guide</p>
+          <p class="eyebrow">Offline field guide</p>
           <h1 id="hero-title">Pokemon Heart &amp; Soul</h1>
           <p>
-            Dex, encounters, items, trainers, teams, battle checks, and portable local saves. Walkthroughs are
+            Dex, encounters, items, trainers, teams, battle checks, and encrypted portable saves. Walkthroughs are
             intentionally left out.
           </p>
         </div>
@@ -202,10 +202,17 @@
             <p class="eyebrow">Portable progress</p>
             <h2 id="save-heading">Save</h2>
           </div>
-          <p class="result-count">Export/import now; cloud sync can be added next</p>
+          <p class="result-count">Export, encrypted sync, and local recovery</p>
         </div>
         <div class="save-layout" id="save-panel"></div>
       </section>
     </main>
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker.register("./sw.js").catch(() => {});
+        });
+      }
+    </script>
   </body>
 </html>

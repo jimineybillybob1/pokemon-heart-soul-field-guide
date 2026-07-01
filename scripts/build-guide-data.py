@@ -509,7 +509,7 @@ def build_data(workbook_path, source_root):
     data = {
         "meta": {
             "title": "Pokemon Heart & Soul Field Guide",
-            "version": "MVP",
+            "version": "1.0",
             "generatedAt": datetime.now(timezone.utc).isoformat(),
             "workbook": Path(workbook_path).name,
             "counts": {},

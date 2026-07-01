@@ -6,6 +6,11 @@
   }
 
   const saveKey = "heart-soul-field-guide-save-v1";
+  const backupKey = "heart-soul-field-guide-backups-v1";
+  const saveFormat = "heart-soul-field-guide-save";
+  const saveVersion = 1;
+  const maxLocalBackups = 5;
+  const syncCodePrefix = "HNS1";
   const species = [...data.species].sort((a, b) => Number(a.dex || 0) - Number(b.dex || 0));
   const speciesByName = new Map(species.map((entry) => [entry.name, entry]));
   const moveByName = new Map(data.moves.map((move) => [move.name, move]));
@@ -184,12 +189,35 @@
         return;
       }
 
+      if (event.target.closest("#create-sync-code")) {
+        createSyncCode();
+        return;
+      }
+
+      if (event.target.closest("#copy-sync-code")) {
+        copySyncCode();
+        return;
+      }
+
+      if (event.target.closest("#load-sync-code")) {
+        loadSyncCode();
+        return;
+      }
+
+      const restoreBackupButton = event.target.closest("[data-restore-backup]");
+      if (restoreBackupButton) {
+        restoreLocalBackup(restoreBackupButton.dataset.restoreBackup);
+        return;
+      }
+
       if (event.target.closest("#reset-save")) {
         if (confirm("Reset caught Pokemon, team, planner, battle settings, and rules?")) {
+          saveLocalBackup("Before reset");
           const fresh = defaultState();
           Object.assign(state, fresh);
           persist();
           rerenderStateful();
+          setSaveStatus("Local save reset. A recovery backup was kept.", "success");
         }
       }
     });
@@ -257,6 +285,7 @@
       renderRules();
       renderTeam();
       renderBattlePlanner();
+      renderSave();
     } else if (target.matches("[data-team-species]")) {
       const index = Number(target.dataset.teamSpecies);
       const entry = speciesByName.get(target.value);
@@ -270,12 +299,14 @@
       state.team[Number(target.dataset.teamAbility)].ability = target.value;
       persist();
       renderBattlePlanner();
+      renderSave();
     } else if (target.matches("[data-team-move]")) {
       const index = Number(target.dataset.teamSlot);
       const moveIndex = Number(target.dataset.teamMove);
       state.team[index].moves[moveIndex] = target.value;
       persist();
       renderBattlePlanner();
+      renderSave();
     } else if (target.matches("[data-planner-species]")) {
       const index = Number(target.dataset.plannerSpecies);
       state.planner[index].species = target.value;
@@ -303,6 +334,7 @@
       state.battleTargets[Number(target.dataset.battleTarget)] = target.value;
       persist();
       renderBattlePlanner();
+      renderSave();
     } else if (target.matches("#import-save-file")) {
       importSave(target.files?.[0]);
       target.value = "";
@@ -993,27 +1025,60 @@
 
   function renderSave() {
     const save = makeSaveDocument();
+    const backups = getLocalBackups();
+    const syncReady = syncCryptoAvailable();
     els.savePanel.innerHTML = `
       <article class="save-card">
-        <header><h3>Progress Summary</h3></header>
+        <header><h3>Progress Summary</h3><span class="chip">Autosaved</span></header>
         <div class="chip-row">
           <span class="chip">${caughtCount()} caught</span>
           <span class="chip">${state.team.filter((slot) => slot.species).length} team slots</span>
           <span class="chip">${state.planner.filter((slot) => slot.species).length} planned</span>
           <span class="chip">${state.battleMode === "trainer" ? `Boss: ${text(selectedBattleTrainer()?.name || "trainer")}` : "Custom battle"}</span>
           <span class="chip">Revision ${save.revision}</span>
+          <span class="chip">Updated ${text(formatDate(state.updatedAt))}</span>
         </div>
-        <p class="notice">Cloud sync is not wired in this MVP yet. Export/import gives us portable saves now, and the Dreamstone encrypted sync worker can be adapted next.</p>
       </article>
       <article class="save-card">
-        <header><h3>Save Actions</h3></header>
+        <header><h3>File Save</h3></header>
         <div class="save-actions">
           <button class="button" id="export-save" type="button">Export save</button>
           <label class="button" for="import-save-file">Import save</label>
           <input class="sr-only" id="import-save-file" type="file" accept="application/json,.json" />
           <button class="button" id="reset-save" type="button">Reset local save</button>
         </div>
+        <p class="save-status" id="save-operation-status" aria-live="polite"></p>
       </article>
+      <article class="save-card">
+        <header><h3>Encrypted Sync</h3><span class="chip">${syncReady ? "Ready" : "Unavailable"}</span></header>
+        <div class="sync-grid">
+          <label class="field"><span>Passphrase</span><input id="sync-passphrase" type="password" autocomplete="current-password" placeholder="Private sync phrase" /></label>
+          <label class="field"><span>Sync code</span><textarea id="sync-code" class="sync-code-area" spellcheck="false" placeholder="Encrypted save code"></textarea></label>
+        </div>
+        <div class="save-actions">
+          <button class="button" id="create-sync-code" type="button" ${syncReady ? "" : "disabled"}>Create code</button>
+          <button class="button" id="copy-sync-code" type="button" ${syncReady ? "" : "disabled"}>Copy code</button>
+          <button class="button" id="load-sync-code" type="button" ${syncReady ? "" : "disabled"}>Load code</button>
+        </div>
+      </article>
+      <article class="save-card">
+        <header><h3>Recovery</h3><span class="chip">${backups.length} backups</span></header>
+        <div class="backup-list">
+          ${backups.length ? backups.map(renderBackupEntry).join("") : empty("No recovery backups yet.")}
+        </div>
+      </article>
+    `;
+  }
+
+  function renderBackupEntry(backup) {
+    return `
+      <div class="backup-entry">
+        <div>
+          <strong>${text(backup.reason || "Recovery backup")}</strong>
+          <small class="muted">Revision ${value(backup.revision)} / ${text(formatDate(backup.savedAt))}</small>
+        </div>
+        <button class="small-button" type="button" data-restore-backup="${attr(backup.id)}">Restore</button>
+      </div>
     `;
   }
 
@@ -1188,12 +1253,36 @@
 
   function makeSaveDocument() {
     return {
+      format: saveFormat,
       app: "heart-soul-field-guide",
-      version: 1,
+      version: saveVersion,
       revision: state.revision,
       exportedAt: new Date().toISOString(),
       state,
     };
+  }
+
+  function validateSaveDocument(input) {
+    if (!input || typeof input !== "object") throw new Error("This save file is empty or invalid.");
+    if (input.format && (input.format !== saveFormat || input.version !== saveVersion)) {
+      throw new Error("This is not a supported Heart & Soul Field Guide save.");
+    }
+    if (input.app && input.app !== "heart-soul-field-guide") {
+      throw new Error("This save belongs to a different guide.");
+    }
+    return sanitizeState(input.state || input);
+  }
+
+  function applySaveDocument(input, { source = "import", createBackup = true } = {}) {
+    const next = validateSaveDocument(input);
+    if (createBackup) {
+      const reason = source === "sync" ? "Before sync load" : source === "backup" ? "Before recovery restore" : "Before import";
+      saveLocalBackup(reason);
+    }
+    Object.assign(state, next);
+    persist();
+    rerenderStateful();
+    return next;
   }
 
   function exportSave() {
@@ -1206,26 +1295,183 @@
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
+    setSaveStatus("Save exported.", "success");
   }
 
   async function importSave(file) {
     if (!file) return;
     try {
       const imported = JSON.parse(await file.text());
-      const next = sanitizeState(imported.state || imported);
-      Object.assign(state, next);
-      state.revision += 1;
-      persist();
-      rerenderStateful();
+      if (!confirm("Replace this browser's current Heart & Soul progress with the imported save?")) return;
+      applySaveDocument(imported, { source: "import" });
+      setSaveStatus("Save imported. A recovery backup was kept.", "success");
     } catch (error) {
-      alert(`Could not import save: ${error.message}`);
+      setSaveStatus(error.message || "The selected save could not be imported.", "error");
     }
+  }
+
+  async function createSyncCode() {
+    try {
+      const passphrase = syncPassphrase();
+      if (!passphrase) throw new Error("Enter a passphrase first.");
+      const code = await encryptSyncPayload(makeSaveDocument(), passphrase);
+      const output = document.querySelector("#sync-code");
+      if (output) output.value = code;
+      setSaveStatus("Encrypted sync code created.", "success");
+    } catch (error) {
+      setSaveStatus(error.message || "Could not create sync code.", "error");
+    }
+  }
+
+  async function copySyncCode() {
+    try {
+      const code = document.querySelector("#sync-code")?.value.trim();
+      if (!code) throw new Error("Create or paste a sync code first.");
+      if (!navigator.clipboard?.writeText) throw new Error("Clipboard access is not available in this browser.");
+      await navigator.clipboard.writeText(code);
+      setSaveStatus("Sync code copied.", "success");
+    } catch (error) {
+      setSaveStatus(error.message || "Could not copy sync code.", "error");
+    }
+  }
+
+  async function loadSyncCode() {
+    try {
+      const passphrase = syncPassphrase();
+      const code = document.querySelector("#sync-code")?.value.trim();
+      if (!passphrase) throw new Error("Enter the passphrase for this sync code.");
+      if (!code) throw new Error("Paste a sync code first.");
+      const save = await decryptSyncPayload(code, passphrase);
+      if (!confirm("Replace this browser's current Heart & Soul progress with the encrypted sync code?")) return;
+      applySaveDocument(save, { source: "sync" });
+      setSaveStatus("Encrypted sync code loaded. A recovery backup was kept.", "success");
+    } catch (error) {
+      setSaveStatus(error.message || "Could not load sync code.", "error");
+    }
+  }
+
+  function syncPassphrase() {
+    return document.querySelector("#sync-passphrase")?.value.trim() || "";
+  }
+
+  function syncCryptoAvailable() {
+    return Boolean(
+      window.crypto?.subtle &&
+        window.crypto.getRandomValues &&
+        window.TextEncoder &&
+        window.TextDecoder &&
+        window.btoa &&
+        window.atob,
+    );
+  }
+
+  async function encryptSyncPayload(save, passphrase) {
+    if (!syncCryptoAvailable()) throw new Error("Encrypted sync is not available in this browser.");
+    const salt = window.crypto.getRandomValues(new Uint8Array(16));
+    const iv = window.crypto.getRandomValues(new Uint8Array(12));
+    const key = await deriveSyncKey(passphrase, salt);
+    const encoded = new TextEncoder().encode(JSON.stringify(save));
+    const encrypted = new Uint8Array(await window.crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, encoded));
+    return [syncCodePrefix, bytesToBase64Url(salt), bytesToBase64Url(iv), bytesToBase64Url(encrypted)].join(".");
+  }
+
+  async function decryptSyncPayload(code, passphrase) {
+    if (!syncCryptoAvailable()) throw new Error("Encrypted sync is not available in this browser.");
+    const parts = code.split(".");
+    if (parts.length !== 4 || parts[0] !== syncCodePrefix) throw new Error("This is not a Heart & Soul sync code.");
+    const salt = base64UrlToBytes(parts[1]);
+    const iv = base64UrlToBytes(parts[2]);
+    const encrypted = base64UrlToBytes(parts[3]);
+    const key = await deriveSyncKey(passphrase, salt);
+    try {
+      const decrypted = await window.crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, encrypted);
+      return JSON.parse(new TextDecoder().decode(decrypted));
+    } catch {
+      throw new Error("The passphrase does not unlock this sync code.");
+    }
+  }
+
+  async function deriveSyncKey(passphrase, salt) {
+    const baseKey = await window.crypto.subtle.importKey("raw", new TextEncoder().encode(passphrase), "PBKDF2", false, [
+      "deriveKey",
+    ]);
+    return window.crypto.subtle.deriveKey(
+      { name: "PBKDF2", salt, iterations: 120000, hash: "SHA-256" },
+      baseKey,
+      { name: "AES-GCM", length: 256 },
+      false,
+      ["encrypt", "decrypt"],
+    );
+  }
+
+  function bytesToBase64Url(bytes) {
+    let binary = "";
+    bytes.forEach((byte) => {
+      binary += String.fromCharCode(byte);
+    });
+    return window.btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+
+  function base64UrlToBytes(value) {
+    const base64 = value.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(value.length / 4) * 4, "=");
+    const binary = window.atob(base64);
+    return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  }
+
+  function getLocalBackups() {
+    try {
+      const backups = JSON.parse(localStorage.getItem(backupKey) || "[]");
+      return Array.isArray(backups) ? backups.filter((backup) => backup && typeof backup === "object") : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function saveLocalBackup(reason) {
+    const backups = getLocalBackups();
+    const backup = {
+      id: makeId(),
+      reason,
+      savedAt: new Date().toISOString(),
+      revision: state.revision,
+      save: makeSaveDocument(),
+    };
+    try {
+      localStorage.setItem(backupKey, JSON.stringify([backup, ...backups].slice(0, maxLocalBackups)));
+    } catch (error) {
+      console.warn("Could not store local recovery backup.", error);
+    }
+  }
+
+  function restoreLocalBackup(id) {
+    const backup = getLocalBackups().find((entry) => entry.id === id);
+    if (!backup?.save) return;
+    if (!confirm("Replace this browser's current Heart & Soul progress with this recovery backup?")) return;
+    applySaveDocument(backup.save, { source: "backup", createBackup: true });
+    setSaveStatus("Recovery backup restored.", "success");
+  }
+
+  function makeId() {
+    if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+    return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  }
+
+  function setSaveStatus(message, type = "") {
+    const status = document.querySelector("#save-operation-status");
+    if (!status) return;
+    status.textContent = message;
+    status.dataset.status = type;
   }
 
   function persist() {
     state.revision += 1;
     state.updatedAt = new Date().toISOString();
-    localStorage.setItem(saveKey, JSON.stringify(state));
+    try {
+      localStorage.setItem(saveKey, JSON.stringify(state));
+    } catch (error) {
+      console.warn("Could not save local guide state.", error);
+      setSaveStatus("Local storage is full or unavailable.", "error");
+    }
   }
 
   function loadState() {
@@ -1459,6 +1705,13 @@
 
   function value(input) {
     return input === null || input === undefined || input === "" ? "" : text(input);
+  }
+
+  function formatDate(input) {
+    if (!input) return "Never";
+    const date = new Date(input);
+    if (Number.isNaN(date.getTime())) return String(input);
+    return date.toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
   }
 
   function text(input) {

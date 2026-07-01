@@ -1,7 +1,7 @@
 {
   "name": "Pokemon Heart & Soul Field Guide",
   "short_name": "H&S Guide",
-  "description": "A Dex, encounter, team, battle, and save guide for Pokemon Heart & Soul.",
+  "description": "An offline Dex, encounter, team, battle, and encrypted save guide for Pokemon Heart & Soul.",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#f7f8fb",
@@ -15,4 +15,3 @@
     }
   ]
 }
-
