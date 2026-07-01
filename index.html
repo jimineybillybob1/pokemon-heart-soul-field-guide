@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pokemon Heart & Soul Field Guide</title>
+    <meta
+      name="description"
+      content="A Dex, encounter, team, battle, item, trainer, and save guide for Pokemon Heart & Soul."
+    />
+    <meta name="theme-color" content="#d8413a" />
+    <link rel="manifest" href="site.webmanifest" />
+    <link rel="icon" href="assets/art/heart-soul-logo.png" />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="data/heart-soul-data.js" defer></script>
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <header class="app-header">
+      <nav class="topbar" aria-label="Primary">
+        <a class="brand" href="#dex" data-view-link="dex">
+          <img src="assets/art/heart-soul-logo.png" alt="" />
+          <span>Heart &amp; Soul Guide</span>
+        </a>
+        <div class="top-actions">
+          <button class="icon-button" id="theme-toggle" type="button" aria-label="Toggle theme">
+            <span aria-hidden="true">T</span>
+          </button>
+          <a class="source-link" href="https://pokemonheartsoul.com/" target="_blank" rel="noreferrer">Site</a>
+          <a
+            class="source-link"
+            href="https://github.com/PokemonHnS-Development/pokemonHnS"
+            target="_blank"
+            rel="noreferrer"
+            >Source</a
+          >
+        </div>
+      </nav>
+
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="eyebrow">MVP field guide</p>
+          <h1 id="hero-title">Pokemon Heart &amp; Soul</h1>
+          <p>
+            Dex, encounters, items, trainers, teams, battle checks, and portable local saves. Walkthroughs are
+            intentionally left out.
+          </p>
+        </div>
+        <div class="hero-media">
+          <img src="assets/art/heart-soul-title.png" alt="Pokemon Heart and Soul title screen" />
+        </div>
+      </section>
+
+      <section class="dashboard" aria-label="Guide summary">
+        <button class="stat-card" type="button" data-view-link="dex">
+          <span id="stat-species">423</span>
+          <small>Dex entries</small>
+        </button>
+        <button class="stat-card" type="button" data-view-link="locations">
+          <span id="stat-locations">144</span>
+          <small>Locations</small>
+        </button>
+        <button class="stat-card" type="button" data-view-link="items">
+          <span id="stat-items">175</span>
+          <small>Items</small>
+        </button>
+        <button class="stat-card" type="button" data-view-link="trainers">
+          <span id="stat-trainers">71</span>
+          <small>Trainer teams</small>
+        </button>
+        <button class="stat-card" type="button" data-view-link="save">
+          <span id="stat-caught">0</span>
+          <small>Caught</small>
+        </button>
+      </section>
+
+      <nav class="tabs" aria-label="Guide sections">
+        <button class="tab is-active" type="button" data-view="dex">Full Dex</button>
+        <button class="tab" type="button" data-view="locations">Locations</button>
+        <button class="tab" type="button" data-view="items">Items</button>
+        <button class="tab" type="button" data-view="moves">Moves</button>
+        <button class="tab" type="button" data-view="trainers">Trainers</button>
+        <button class="tab" type="button" data-view="team">Team Builder</button>
+        <button class="tab" type="button" data-view="planner">Team Planner</button>
+        <button class="tab" type="button" data-view="battle">Battle Planner</button>
+        <button class="tab" type="button" data-view="more">More</button>
+        <button class="tab" type="button" data-view="save">Save</button>
+      </nav>
+    </header>
+
+    <main class="app-main">
+      <section class="view is-active" id="view-dex" aria-labelledby="dex-heading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Capture index</p>
+            <h2 id="dex-heading">Full Dex</h2>
+          </div>
+          <p id="dex-count" class="result-count"></p>
+        </div>
+        <div class="toolbar" id="dex-controls"></div>
+        <div class="card-grid dex-grid" id="dex-grid"></div>
+      </section>
+
+      <section class="view" id="view-locations" aria-labelledby="locations-heading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Encounter atlas</p>
+            <h2 id="locations-heading">Locations</h2>
+          </div>
+          <p id="location-count" class="result-count"></p>
+        </div>
+        <div class="toolbar" id="location-controls"></div>
+        <div class="location-list" id="location-list"></div>
+      </section>
+
+      <section class="view" id="view-items" aria-labelledby="items-heading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Item reference</p>
+            <h2 id="items-heading">Items, TMs, HMs, and Berries</h2>
+          </div>
+          <p id="item-count" class="result-count"></p>
+        </div>
+        <div class="toolbar" id="item-controls"></div>
+        <div class="table-wrap" id="item-table"></div>
+      </section>
+
+      <section class="view" id="view-moves" aria-labelledby="moves-heading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Move catalogue</p>
+            <h2 id="moves-heading">Moves and Tutors</h2>
+          </div>
+          <p id="move-count" class="result-count"></p>
+        </div>
+        <div class="toolbar" id="move-controls"></div>
+        <div class="table-wrap" id="move-table"></div>
+      </section>
+
+      <section class="view" id="view-trainers" aria-labelledby="trainers-heading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Boss prep</p>
+            <h2 id="trainers-heading">Trainer Teams</h2>
+          </div>
+          <p id="trainer-count" class="result-count"></p>
+        </div>
+        <div class="toolbar" id="trainer-controls"></div>
+        <div class="trainer-list" id="trainer-list"></div>
+      </section>
+
+      <section class="view" id="view-team" aria-labelledby="team-heading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Current party</p>
+            <h2 id="team-heading">Team Builder</h2>
+          </div>
+          <p class="result-count">Saved locally in this browser</p>
+        </div>
+        <div class="rules-panel" id="rules-panel"></div>
+        <div class="team-grid" id="team-grid"></div>
+      </section>
+
+      <section class="view" id="view-planner" aria-labelledby="planner-heading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Future party</p>
+            <h2 id="planner-heading">Team Planner</h2>
+          </div>
+          <p class="result-count">Six long-term slots with notes</p>
+        </div>
+        <div class="team-grid" id="planner-grid"></div>
+      </section>
+
+      <section class="view" id="view-battle" aria-labelledby="battle-heading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Matchup check</p>
+            <h2 id="battle-heading">Battle Planner</h2>
+          </div>
+          <p class="result-count">Uses selected Team Builder moves</p>
+        </div>
+        <div class="battle-layout">
+          <div class="panel" id="battle-targets"></div>
+          <div class="panel" id="battle-results"></div>
+        </div>
+      </section>
+
+      <section class="view" id="view-more" aria-labelledby="more-heading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Reference shelf</p>
+            <h2 id="more-heading">FAQ, Completion, Rematches, and Credits</h2>
+          </div>
+        </div>
+        <div class="more-grid" id="more-grid"></div>
+      </section>
+
+      <section class="view" id="view-save" aria-labelledby="save-heading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Portable progress</p>
+            <h2 id="save-heading">Save</h2>
+          </div>
+          <p class="result-count">Export/import now; cloud sync can be added next</p>
+        </div>
+        <div class="save-layout" id="save-panel"></div>
+      </section>
+    </main>
+  </body>
+</html>
