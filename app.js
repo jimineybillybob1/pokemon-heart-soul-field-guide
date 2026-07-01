@@ -9,6 +9,8 @@
   const species = [...data.species].sort((a, b) => Number(a.dex || 0) - Number(b.dex || 0));
   const speciesByName = new Map(species.map((entry) => [entry.name, entry]));
   const moveByName = new Map(data.moves.map((move) => [move.name, move]));
+  const trainersById = new Map(data.trainers.map((trainer) => [trainer.id, trainer]));
+  const trainerCategories = unique(data.trainers.map((trainer) => trainer.category)).sort((a, b) => a.localeCompare(b));
   const typeNames = [
     "Normal",
     "Fire",
@@ -157,6 +159,12 @@
         return;
       }
 
+      const trainerPlanButton = event.target.closest("[data-plan-trainer]");
+      if (trainerPlanButton) {
+        planTrainerBattle(trainerPlanButton.dataset.planTrainer);
+        return;
+      }
+
       const clearTeam = event.target.closest("[data-clear-team]");
       if (clearTeam) {
         state.team[Number(clearTeam.dataset.clearTeam)] = blankTeamSlot();
@@ -177,7 +185,7 @@
       }
 
       if (event.target.closest("#reset-save")) {
-        if (confirm("Reset caught Pokemon, team, planner, battle targets, and rules?")) {
+        if (confirm("Reset caught Pokemon, team, planner, battle settings, and rules?")) {
           const fresh = defaultState();
           Object.assign(state, fresh);
           persist();
@@ -272,6 +280,25 @@
       const index = Number(target.dataset.plannerSpecies);
       state.planner[index].species = target.value;
       persistAndRenderPlanner();
+    } else if (target.matches("[data-battle-mode]")) {
+      state.battleMode = target.value === "trainer" ? "trainer" : "custom";
+      if (state.battleMode === "trainer") ensureSelectedTrainer();
+      persist();
+      renderBattlePlanner();
+      renderSave();
+    } else if (target.matches("#battle-trainer-category")) {
+      state.battleTrainerCategory = target.value;
+      state.battleTrainerId = firstTrainerForCategory(target.value)?.id || "";
+      persist();
+      renderBattlePlanner();
+      renderSave();
+    } else if (target.matches("#battle-trainer-id")) {
+      state.battleTrainerId = target.value;
+      const trainer = trainersById.get(target.value);
+      state.battleTrainerCategory = trainer?.category || state.battleTrainerCategory;
+      persist();
+      renderBattlePlanner();
+      renderSave();
     } else if (target.matches("[data-battle-target]")) {
       state.battleTargets[Number(target.dataset.battleTarget)] = target.value;
       persist();
@@ -285,7 +312,7 @@
   function renderControls() {
     const typeOptions = ["", ...typeNames].map((type) => option(type, type || "Any type")).join("");
     const itemTypes = unique(data.items.map((item) => item.type)).sort();
-    const trainerCategories = unique(data.trainers.map((trainer) => trainer.category)).sort();
+    const trainerCategoryOptions = trainerCategories;
     els.dexControls.innerHTML = `
       <label class="field grow"><span>Search</span><input id="dex-search" type="search" placeholder="Pokemon, ability, item, location" value="${attr(filters.dexSearch)}" /></label>
       <label class="field"><span>Type</span><select id="dex-type">${typeOptions}</select></label>
@@ -316,7 +343,7 @@
     `;
     els.trainerControls.innerHTML = `
       <label class="field grow"><span>Search</span><input id="trainer-search" type="search" placeholder="Trainer, category, Pokemon, move" value="${attr(filters.trainerSearch)}" /></label>
-      <label class="field"><span>Category</span><select id="trainer-category">${option("", "Any category")}${trainerCategories.map((category) => option(category, category)).join("")}</select></label>
+      <label class="field"><span>Category</span><select id="trainer-category">${option("", "Any category")}${trainerCategoryOptions.map((category) => option(category, category)).join("")}</select></label>
     `;
   }
 
@@ -563,7 +590,10 @@
             <small class="muted">${text(trainer.category)}</small>
             <h3>${text(trainer.name)}</h3>
           </div>
-          <span class="chip">${trainer.team.length} Pokemon</span>
+          <div class="trainer-actions">
+            <span class="chip">${trainer.team.length} Pokemon</span>
+            <button class="small-button" type="button" data-plan-trainer="${attr(trainer.id)}">Plan this trainer</button>
+          </div>
         </header>
         <div class="trainer-team">
           ${trainer.team
@@ -644,53 +674,281 @@
   }
 
   function renderBattlePlanner() {
+    const isTrainerMode = state.battleMode === "trainer";
+    const trainer = isTrainerMode ? ensureSelectedTrainer() : null;
+    const targets = activeBattleTargets();
+    const teamMembers = selectedTeamMembers();
+    const moveChoices = selectedTeamMoveChoices();
+
     els.battleTargets.innerHTML = `
       <h3>Targets</h3>
-      <p class="muted">Pick opposing Pokemon, then compare against the damaging moves selected in Team Builder.</p>
-      ${[0, 1]
-        .map(
-          (index) => `
-            <label class="target-row"><span class="muted">Target ${index + 1}</span><select data-battle-target="${index}">${speciesSelect(state.battleTargets[index])}</select></label>
-          `,
-        )
-        .join("")}
+      <p class="muted">Compare your Team Builder moves into custom targets or a documented boss team.</p>
+      <div class="mode-toggle" role="radiogroup" aria-label="Battle planner mode">
+        <label class="rule-toggle"><input type="radio" name="battle-mode" data-battle-mode value="custom" ${!isTrainerMode ? "checked" : ""} /> Custom targets</label>
+        <label class="rule-toggle"><input type="radio" name="battle-mode" data-battle-mode value="trainer" ${isTrainerMode ? "checked" : ""} /> Boss battle</label>
+      </div>
+      ${isTrainerMode ? renderTrainerBattleControls(trainer) : renderCustomTargetControls()}
+      ${isTrainerMode && trainer ? renderTrainerBattlePreview(trainer) : ""}
+      ${renderTeamCoverage(teamMembers, moveChoices)}
     `;
-    const recommendations = getBattleRecommendations();
     els.battleResults.innerHTML = `
-      <h3>Recommendations</h3>
-      <div class="recommendations">
-        ${recommendations.length ? recommendations.map(renderRecommendation).join("") : empty("Add Pokemon and damaging moves in Team Builder, then pick a target.")}
+      <h3>${isTrainerMode ? "Boss Matchups" : "Recommendations"}</h3>
+      ${renderOffensiveMatchups(targets, moveChoices)}
+      ${isTrainerMode ? renderDefensiveThreats(trainer, teamMembers) : ""}
+    `;
+  }
+
+  function renderCustomTargetControls() {
+    return [0, 1]
+      .map(
+        (index) => `
+          <label class="target-row"><span class="muted">Target ${index + 1}</span><select data-battle-target="${index}">${speciesSelect(state.battleTargets[index])}</select></label>
+        `,
+      )
+      .join("");
+  }
+
+  function renderTrainerBattleControls(trainer) {
+    const category = trainer?.category || state.battleTrainerCategory || trainerCategories[0] || "";
+    const trainerOptions = trainersForCategory(category);
+    return `
+      <div class="battle-controls">
+        <label class="field"><span>Category</span><select id="battle-trainer-category">
+          ${trainerCategories.map((item) => option(item, item, item === category)).join("")}
+        </select></label>
+        <label class="field"><span>Trainer</span><select id="battle-trainer-id">
+          ${trainerOptions.map((item) => option(item.id, item.name, item.id === trainer?.id)).join("")}
+        </select></label>
       </div>
     `;
   }
 
-  function getBattleRecommendations() {
-    const targets = state.battleTargets.map((name) => speciesByName.get(name)).filter(Boolean);
-    if (!targets.length) return [];
-    const choices = [];
-    state.team.forEach((slot) => {
-      const user = speciesByName.get(slot.species);
-      if (!user) return;
-      slot.moves.filter(Boolean).forEach((moveName) => {
+  function renderTrainerBattlePreview(trainer) {
+    return `
+      <section class="battle-side-section">
+        <header>
+          <div>
+            <small class="muted">${text(trainer.category)}</small>
+            <h4>${text(trainer.name)}</h4>
+          </div>
+          <span class="chip">${trainer.team.length} targets</span>
+        </header>
+        <div class="trainer-target-list">
+          ${trainer.team.map(renderTrainerTarget).join("")}
+        </div>
+      </section>
+    `;
+  }
+
+  function renderTrainerTarget(mon) {
+    const entry = speciesByName.get(mon.species) || { name: mon.species, types: [], sprite: "" };
+    return `
+      <div class="trainer-target">
+        ${sprite(entry)}
+        <div>
+          <strong>${text(mon.species)}${mon.level ? ` Lv ${value(mon.level)}` : ""}</strong>
+          <div class="type-row">${entry.types.map(typePill).join("")}</div>
+          ${mon.item ? `<small class="muted">${text(mon.item)}</small>` : ""}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderTeamCoverage(teamMembers, moveChoices) {
+    const offensiveCoverage = typeNames
+      .map((defenderType) => ({
+        type: defenderType,
+        best: moveChoices.length ? Math.max(...moveChoices.map((choice) => typeMultiplier(choice.move.type, [defenderType]))) : 0,
+      }))
+      .filter((item) => item.best >= 2)
+      .sort((a, b) => b.best - a.best || a.type.localeCompare(b.type));
+    const defensiveCoverage = typeNames
+      .map((attackType) => ({
+        type: attackType,
+        weak: teamMembers.filter((member) => typeMultiplier(attackType, member.entry.types) >= 2).length,
+        resists: teamMembers.filter((member) => {
+          const multiplier = typeMultiplier(attackType, member.entry.types);
+          return multiplier > 0 && multiplier <= 0.5;
+        }).length,
+        immune: teamMembers.filter((member) => typeMultiplier(attackType, member.entry.types) === 0).length,
+      }))
+      .filter((item) => item.weak || item.resists || item.immune)
+      .sort((a, b) => b.weak - a.weak || b.immune + b.resists - (a.immune + a.resists) || a.type.localeCompare(b.type));
+
+    return `
+      <section class="battle-side-section">
+        <header><h4>Team Coverage</h4></header>
+        <div class="coverage-block">
+          <small class="muted">Super-effective move reach</small>
+          <div class="chip-row">
+            ${
+              offensiveCoverage.length
+                ? offensiveCoverage.slice(0, 12).map((item) => `<span class="chip">${text(item.type)} ${effectivenessLabel(item.best)}</span>`).join("")
+                : '<span class="chip">Add damaging moves</span>'
+            }
+          </div>
+        </div>
+        <div class="coverage-block">
+          <small class="muted">Defensive profile</small>
+          <div class="coverage-grid">
+            ${
+              defensiveCoverage.length
+                ? defensiveCoverage
+                    .slice(0, 10)
+                    .map(
+                      (item) => `
+                        <div class="coverage-line">
+                          ${typePill(item.type)}
+                          <span>${item.weak} weak</span>
+                          <span>${item.resists + item.immune} checks</span>
+                        </div>
+                      `,
+                    )
+                    .join("")
+                : '<span class="muted">Add Pokemon to Team Builder.</span>'
+            }
+          </div>
+        </div>
+      </section>
+    `;
+  }
+
+  function renderOffensiveMatchups(targets, moveChoices) {
+    if (!targets.length) return empty("Pick a target or boss trainer to start comparing matchups.");
+    if (!moveChoices.length) return empty("Add Pokemon and damaging moves in Team Builder to see attack recommendations.");
+    return `
+      <section class="battle-section">
+        <header>
+          <h4>Offensive Answers</h4>
+          <span class="chip">${targets.length} targets</span>
+        </header>
+        <div class="matchup-grid">
+          ${targets.map((target) => renderMatchupCard(target, moveChoices)).join("")}
+        </div>
+      </section>
+    `;
+  }
+
+  function renderMatchupCard(target, moveChoices) {
+    const answers = getOffensiveAnswersForTarget(target, moveChoices).slice(0, 6);
+    return `
+      <article class="matchup-card">
+        ${renderTargetSummary(target)}
+        <div class="answer-list">
+          ${answers.map(renderAnswerCard).join("")}
+        </div>
+      </article>
+    `;
+  }
+
+  function renderTargetSummary(target) {
+    const entry = target.species;
+    const mon = target.mon || {};
+    return `
+      <div class="target-summary">
+        ${sprite(entry)}
+        <div>
+          <strong>${text(entry.name)}${mon.level ? ` Lv ${value(mon.level)}` : ""}</strong>
+          <div class="type-row">${entry.types.map(typePill).join("")}</div>
+          <div class="chip-row">
+            <span class="chip">Dex #${paddedDex(entry.dex)}</span>
+            <span class="chip">BST ${value(entry.bst)}</span>
+            ${mon.item ? `<span class="chip">${text(mon.item)}</span>` : ""}
+          </div>
+          ${mon.moves?.length ? `<div class="mini-list">${mon.moves.map((move) => `<span class="chip">${text(move)}</span>`).join("")}</div>` : ""}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderAnswerCard(item) {
+    const score = scoreForMultiplier(item.multiplier);
+    const moveType = normalizeTypeForRules(item.move.type);
+    const stab = item.user.types.map(normalizeTypeForRules).includes(moveType);
+    return `
+      <div class="answer-card" data-score="${score}">
+        <strong>${text(item.user.name)} uses ${text(item.move.name)}</strong>
+        <div class="answer-meta">
+          ${typePill(item.move.type)}
+          <span class="chip">${text(effectiveCategory(item.move))}</span>
+          <span class="chip">${value(item.move.power)} power</span>
+          <span class="chip">${effectivenessLabel(item.multiplier)}</span>
+          ${stab ? '<span class="chip">STAB</span>' : ""}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderDefensiveThreats(trainer, teamMembers) {
+    if (!trainer) return "";
+    if (!teamMembers.length) {
+      return `
+        <section class="battle-section">
+          <header><h4>Defensive Threats</h4></header>
+          ${empty("Add Pokemon in Team Builder to see what the boss team hits hard or bounces off.")}
+        </section>
+      `;
+    }
+
+    const rows = [];
+    trainer.team.forEach((mon) => {
+      mon.moves.forEach((moveName) => {
         const move = moveByName.get(moveName);
-        if (!move || effectiveCategory(move) === "Status" || Number(move.power || 0) <= 0) return;
-        targets.forEach((target) => {
-          const multiplier = typeMultiplier(move.type, target.types);
-          choices.push({ user, move, target, multiplier });
+        if (!isDamagingMove(move)) return;
+        teamMembers.forEach((member) => {
+          rows.push({
+            source: mon,
+            move,
+            member,
+            multiplier: typeMultiplier(move.type, member.entry.types),
+          });
         });
       });
     });
-    return choices
+
+    const highRisk = rows
+      .filter((row) => row.multiplier >= 2)
       .sort((a, b) => b.multiplier - a.multiplier || Number(b.move.power || 0) - Number(a.move.power || 0))
-      .slice(0, 24);
+      .slice(0, 12);
+    const pivots = rows
+      .filter((row) => row.multiplier < 1)
+      .sort((a, b) => a.multiplier - b.multiplier || Number(b.move.power || 0) - Number(a.move.power || 0))
+      .slice(0, 12);
+
+    return `
+      <section class="battle-section">
+        <header>
+          <h4>Defensive Threats</h4>
+          <span class="chip">${trainer.name}</span>
+        </header>
+        <div class="threat-columns">
+          <div>
+            <h5>High Risk</h5>
+            <div class="threat-grid">
+              ${highRisk.length ? highRisk.map(renderThreatCard).join("") : empty("No 2x or 4x hits found into the current team.")}
+            </div>
+          </div>
+          <div>
+            <h5>Possible Pivots</h5>
+            <div class="threat-grid">
+              ${pivots.length ? pivots.map(renderThreatCard).join("") : empty("No resists or immunities found into the listed boss moves.")}
+            </div>
+          </div>
+        </div>
+      </section>
+    `;
   }
 
-  function renderRecommendation(item) {
-    const score = item.multiplier >= 4 ? "4" : item.multiplier >= 2 ? "2" : item.multiplier === 0 ? "0" : "1";
+  function renderThreatCard(item) {
     return `
-      <div class="recommendation" data-score="${score}">
-        <strong>${text(item.user.name)} uses ${text(item.move.name)} into ${text(item.target.name)}</strong>
-        <span>${typePill(item.move.type)} ${text(effectiveCategory(item.move))} / ${value(item.move.power)} power / ${item.multiplier}x effectiveness</span>
+      <div class="threat-card" data-score="${scoreForMultiplier(item.multiplier)}">
+        <strong>${text(item.source.species)} ${text(item.move.name)}</strong>
+        <span>Into ${text(item.member.entry.name)}: ${effectivenessLabel(item.multiplier)}</span>
+        <div class="answer-meta">
+          ${typePill(item.move.type)}
+          <span class="chip">${text(effectiveCategory(item.move))}</span>
+          <span class="chip">${value(item.move.power)} power</span>
+        </div>
       </div>
     `;
   }
@@ -742,6 +1000,7 @@
           <span class="chip">${caughtCount()} caught</span>
           <span class="chip">${state.team.filter((slot) => slot.species).length} team slots</span>
           <span class="chip">${state.planner.filter((slot) => slot.species).length} planned</span>
+          <span class="chip">${state.battleMode === "trainer" ? `Boss: ${text(selectedBattleTrainer()?.name || "trainer")}` : "Custom battle"}</span>
           <span class="chip">Revision ${save.revision}</span>
         </div>
         <p class="notice">Cloud sync is not wired in this MVP yet. Export/import gives us portable saves now, and the Dreamstone encrypted sync worker can be adapted next.</p>
@@ -797,6 +1056,110 @@
     slot.species = name;
     persistAndRenderPlanner();
     showView("planner");
+  }
+
+  function planTrainerBattle(trainerId) {
+    const trainer = trainersById.get(trainerId);
+    if (!trainer) return;
+    state.battleMode = "trainer";
+    state.battleTrainerCategory = trainer.category;
+    state.battleTrainerId = trainer.id;
+    persist();
+    renderBattlePlanner();
+    renderSave();
+    showView("battle");
+  }
+
+  function firstTrainerForCategory(category) {
+    return data.trainers.find((trainer) => trainer.category === category) || data.trainers[0] || null;
+  }
+
+  function trainersForCategory(category) {
+    return data.trainers.filter((trainer) => trainer.category === category);
+  }
+
+  function selectedBattleTrainer() {
+    return trainersById.get(state.battleTrainerId) || null;
+  }
+
+  function ensureSelectedTrainer() {
+    if (!trainerCategories.includes(state.battleTrainerCategory)) {
+      state.battleTrainerCategory = trainerCategories[0] || "";
+    }
+    const current = selectedBattleTrainer();
+    if (!current || current.category !== state.battleTrainerCategory) {
+      state.battleTrainerId = firstTrainerForCategory(state.battleTrainerCategory)?.id || "";
+    }
+    return selectedBattleTrainer();
+  }
+
+  function activeBattleTargets() {
+    if (state.battleMode === "trainer") {
+      const trainer = selectedBattleTrainer();
+      if (!trainer) return [];
+      return trainer.team
+        .map((mon, index) => {
+          const entry = speciesByName.get(mon.species);
+          return entry ? { id: `${trainer.id}-${index}`, trainer, mon, species: entry } : null;
+        })
+        .filter(Boolean);
+    }
+    return state.battleTargets
+      .map((name, index) => {
+        const entry = speciesByName.get(name);
+        return entry ? { id: `custom-${index}`, mon: { species: entry.name, moves: [] }, species: entry } : null;
+      })
+      .filter(Boolean);
+  }
+
+  function selectedTeamMembers() {
+    return state.team
+      .map((slot, index) => {
+        const entry = speciesByName.get(slot.species);
+        return entry ? { slot, index, entry } : null;
+      })
+      .filter(Boolean);
+  }
+
+  function selectedTeamMoveChoices() {
+    return selectedTeamMembers().flatMap((member) =>
+      member.slot.moves
+        .map((moveName) => moveByName.get(moveName))
+        .filter(isDamagingMove)
+        .map((move) => ({ member, user: member.entry, move })),
+    );
+  }
+
+  function getOffensiveAnswersForTarget(target, moveChoices) {
+    return moveChoices
+      .map((choice) => ({
+        ...choice,
+        target,
+        multiplier: typeMultiplier(choice.move.type, target.species.types),
+      }))
+      .sort((a, b) => b.multiplier - a.multiplier || Number(b.move.power || 0) - Number(a.move.power || 0));
+  }
+
+  function isDamagingMove(move) {
+    return Boolean(move && effectiveCategory(move) !== "Status" && Number(move.power || 0) > 0);
+  }
+
+  function scoreForMultiplier(multiplier) {
+    if (multiplier >= 4) return "4";
+    if (multiplier >= 2) return "2";
+    if (multiplier === 0) return "0";
+    if (multiplier < 1) return "resist";
+    return "1";
+  }
+
+  function effectivenessLabel(multiplier) {
+    if (multiplier === 0) return "Immune";
+    if (multiplier === 0.25) return "0.25x";
+    if (multiplier === 0.5) return "0.5x";
+    if (multiplier === 1) return "1x";
+    if (multiplier === 2) return "2x";
+    if (multiplier === 4) return "4x";
+    return `${multiplier}x`;
   }
 
   function persistAndRenderTeam() {
@@ -877,6 +1240,12 @@
   function sanitizeState(input) {
     const fresh = defaultState();
     if (!input || typeof input !== "object") return fresh;
+    const battleMode = input.battleMode === "trainer" ? "trainer" : "custom";
+    let battleTrainerCategory = trainerCategories.includes(input.battleTrainerCategory) ? input.battleTrainerCategory : fresh.battleTrainerCategory;
+    let battleTrainerId = typeof input.battleTrainerId === "string" && trainersById.has(input.battleTrainerId) ? input.battleTrainerId : "";
+    const trainer = trainersById.get(battleTrainerId);
+    if (trainer && trainer.category !== battleTrainerCategory) battleTrainerId = "";
+    if (!battleTrainerId) battleTrainerId = firstTrainerForCategory(battleTrainerCategory)?.id || fresh.battleTrainerId;
     return {
       theme: input.theme === "dark" ? "dark" : "light",
       revision: Number.isInteger(input.revision) ? input.revision : fresh.revision,
@@ -888,11 +1257,16 @@
       caught: sanitizeCaught(input.caught),
       team: sanitizeSlots(input.team, blankTeamSlot),
       planner: sanitizeSlots(input.planner, blankPlannerSlot),
+      battleMode,
+      battleTrainerCategory,
+      battleTrainerId,
       battleTargets: sanitizeTargets(input.battleTargets),
     };
   }
 
   function defaultState() {
+    const battleTrainerCategory = trainerCategories[0] || "";
+    const battleTrainerId = firstTrainerForCategory(battleTrainerCategory)?.id || "";
     return {
       theme: "light",
       revision: 0,
@@ -901,6 +1275,9 @@
       caught: {},
       team: Array.from({ length: 6 }, blankTeamSlot),
       planner: Array.from({ length: 6 }, blankPlannerSlot),
+      battleMode: "custom",
+      battleTrainerCategory,
+      battleTrainerId,
       battleTargets: ["", ""],
     };
   }

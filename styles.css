@@ -581,6 +581,13 @@ summary {
   margin-bottom: 10px;
 }
 
+.trainer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .encounter-table,
 .data-table {
   width: 100%;
@@ -625,7 +632,10 @@ summary {
 
 .trainer-mon,
 .recommendation,
-.availability-box {
+.availability-box,
+.matchup-card,
+.answer-card,
+.threat-card {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 10px;
@@ -721,6 +731,132 @@ summary {
   margin-bottom: 12px;
 }
 
+.mode-toggle,
+.battle-controls {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.battle-side-section,
+.battle-section {
+  display: grid;
+  gap: 12px;
+}
+
+.battle-side-section {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.battle-side-section header,
+.battle-section header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.battle-side-section h4,
+.battle-section h4,
+.threat-columns h5 {
+  margin: 0;
+}
+
+.trainer-target-list,
+.coverage-block,
+.answer-list,
+.threat-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.trainer-target,
+.target-summary {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.trainer-target .sprite-box,
+.target-summary .sprite-box {
+  width: 54px;
+  height: 54px;
+}
+
+.trainer-target .sprite-box img,
+.target-summary .sprite-box img {
+  width: 48px;
+  height: 48px;
+}
+
+.coverage-grid {
+  display: grid;
+  gap: 6px;
+}
+
+.coverage-line {
+  display: grid;
+  grid-template-columns: minmax(88px, auto) auto auto;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.82rem;
+}
+
+.matchup-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
+}
+
+.matchup-card {
+  display: grid;
+  gap: 10px;
+}
+
+.answer-card,
+.threat-card {
+  display: grid;
+  gap: 6px;
+}
+
+.answer-card[data-score="4"],
+.threat-card[data-score="4"] {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 11%, var(--surface));
+}
+
+.answer-card[data-score="2"],
+.threat-card[data-score="2"] {
+  border-color: var(--gold);
+  background: color-mix(in srgb, var(--gold) 12%, var(--surface));
+}
+
+.answer-card[data-score="resist"],
+.threat-card[data-score="resist"] {
+  border-color: var(--accent-2);
+}
+
+.answer-card[data-score="0"],
+.threat-card[data-score="0"] {
+  opacity: 0.68;
+}
+
+.answer-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.threat-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
 .recommendations {
   display: grid;
   gap: 10px;
@@ -777,7 +913,8 @@ summary {
   .hero,
   .dashboard,
   .battle-layout,
-  .save-layout {
+  .save-layout,
+  .threat-columns {
     grid-template-columns: 1fr;
   }
 

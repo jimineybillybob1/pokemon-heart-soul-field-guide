@@ -27,6 +27,11 @@ TYPE_FIXES = {
     "Psyhcic": "Psychic",
 }
 
+SPECIES_ALIASES = {
+    "Mr Mime": "Mr. Mime",
+    "PorygonZ": "Porygon-Z",
+}
+
 SOURCE_URLS = {
     "officialSite": "https://pokemonheartsoul.com/",
     "sourceRepo": "https://github.com/PokemonHnS-Development/pokemonHnS",
@@ -56,6 +61,11 @@ def numeric_or_none(value):
 def clean_type(value):
     value = compact(value)
     return TYPE_FIXES.get(value, value)
+
+
+def clean_species_name(value):
+    value = compact(value)
+    return SPECIES_ALIASES.get(value, value)
 
 
 def split_lines(value):
@@ -200,7 +210,7 @@ def parse_pokemon_cell(value):
     if not lines:
         return None
     mon = {
-        "species": lines[0],
+        "species": clean_species_name(lines[0]),
         "level": None,
         "item": None,
         "moves": [],
