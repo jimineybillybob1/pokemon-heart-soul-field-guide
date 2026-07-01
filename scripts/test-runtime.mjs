@@ -156,6 +156,9 @@ const bossState = {
   battleTargets: ["", ""],
 };
 const bossApp = runApp(bossState);
+const speciesModalApp = runApp();
+speciesModalApp.elementFor("[data-open-species]").dataset.openSpecies = "Bulbasaur";
+speciesModalApp.click("[data-open-species]");
 defaultApp.elementFor("[data-open-moves]").dataset.openMoves = "Bulbasaur";
 defaultApp.click("[data-open-moves]");
 const syncApp = runApp(null, { crypto: true });
@@ -169,9 +172,19 @@ const checks = {
   dexCardsRendered: defaultApp.elementFor("#dex-grid").innerHTML.includes("Bulbasaur"),
   dexInitialCardCount: (defaultApp.elementFor("#dex-grid").innerHTML.match(/data-species-card=/g) || []).length,
   dexCardsHaveMovesButton: defaultApp.elementFor("#dex-grid").innerHTML.includes("data-open-moves"),
+  dexCardsHaveAbilityButtons: defaultApp.elementFor("#dex-grid").innerHTML.includes("ability-button") && defaultApp.elementFor("#dex-grid").innerHTML.includes("Powers up Grass moves"),
   dexCardsDoNotUseDetailsPane: !defaultApp.elementFor("#dex-grid").innerHTML.includes("<details"),
   dexCardsDoNotUseProfileBlocks: !defaultApp.elementFor("#dex-grid").innerHTML.includes("Profile"),
   dexCardsHideNoneAbilities: !defaultApp.elementFor("#dex-grid").innerHTML.includes(">None</span>"),
+  locationsHaveClickableSpriteEncounters:
+    defaultApp.elementFor("#location-list").innerHTML.includes("data-open-species") &&
+    defaultApp.elementFor("#location-list").innerHTML.includes("encounter-link") &&
+    defaultApp.elementFor("#location-list").innerHTML.includes("mini-sprite"),
+  speciesModalRendered:
+    speciesModalApp.elementFor("#modal-root").innerHTML.includes("data-species-modal=\"Bulbasaur\"") &&
+    speciesModalApp.elementFor("#modal-root").innerHTML.includes("Mark caught") &&
+    speciesModalApp.elementFor("#modal-root").innerHTML.includes("Powers up Grass moves"),
+  itemIconsRendered: defaultApp.elementFor("#item-table").innerHTML.includes("item-icon") && defaultApp.elementFor("#item-table").innerHTML.includes("assets/items/fire_stone.png"),
   movesModalRendered:
     defaultApp.elementFor("#modal-root").innerHTML.includes("Bulbasaur Moves") &&
     defaultApp.elementFor("#modal-root").innerHTML.includes("Vine Whip") &&
@@ -179,9 +192,13 @@ const checks = {
   movesTabHasTutorSection:
     defaultApp.elementFor("#move-table").innerHTML.includes("Tutor moves") &&
     defaultApp.elementFor("#move-table").innerHTML.includes("Requirement") &&
-    defaultApp.elementFor("#move-table").innerHTML.includes("data-move-sections=\"expand\""),
+    defaultApp.elementFor("#move-table").innerHTML.includes("data-move-sections=\"expand\"") &&
+    defaultApp.elementFor("#move-table").innerHTML.includes("section-count"),
+  movesTabTutorRowsPlain: !defaultApp.elementFor("#move-table").innerHTML.includes("data-jump-move"),
   trainerPlanButtonsRendered: defaultApp.elementFor("#trainer-list").innerHTML.includes("Plan this trainer"),
+  trainerSpritesRendered: defaultApp.elementFor("#trainer-list").innerHTML.includes("trainer-avatar") && defaultApp.elementFor("#trainer-list").innerHTML.includes("mini-sprite"),
   teamSlotsRendered: (defaultApp.elementFor("#team-grid").innerHTML.match(/Slot /g) || []).length,
+  teamRulesRemoved: !defaultApp.elementFor("#rules-panel").innerHTML.includes("Fairy type") && !defaultApp.elementFor("#rules-panel").innerHTML.includes("physical/special split"),
   customBattlePlannerRendered: defaultApp.elementFor("#battle-targets").innerHTML.includes("Custom targets"),
   bossBattlePlannerRendered: bossApp.elementFor("#battle-targets").innerHTML.includes("Boss battle") && bossApp.elementFor("#battle-targets").innerHTML.includes(firstTrainer.name),
   bossBattleResultsRendered: bossApp.elementFor("#battle-results").innerHTML.includes("Offensive Answers") && bossApp.elementFor("#battle-results").innerHTML.includes("Defensive Threats"),
@@ -200,13 +217,20 @@ if (
   !checks.dexCardsRendered ||
   checks.dexInitialCardCount !== 50 ||
   !checks.dexCardsHaveMovesButton ||
+  !checks.dexCardsHaveAbilityButtons ||
   !checks.dexCardsDoNotUseDetailsPane ||
   !checks.dexCardsDoNotUseProfileBlocks ||
   !checks.dexCardsHideNoneAbilities ||
+  !checks.locationsHaveClickableSpriteEncounters ||
+  !checks.speciesModalRendered ||
+  !checks.itemIconsRendered ||
   !checks.movesModalRendered ||
   !checks.movesTabHasTutorSection ||
+  !checks.movesTabTutorRowsPlain ||
   !checks.trainerPlanButtonsRendered ||
+  !checks.trainerSpritesRendered ||
   checks.teamSlotsRendered !== 6 ||
+  !checks.teamRulesRemoved ||
   !checks.customBattlePlannerRendered ||
   !checks.bossBattlePlannerRendered ||
   !checks.bossBattleResultsRendered ||

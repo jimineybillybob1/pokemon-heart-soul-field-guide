@@ -65,6 +65,89 @@
     Fairy: "#d45fa8",
     Mystery: "#6a7a8a",
   };
+  const abilityDetails = {
+    "stench": "Helps repel wild Pokemon.",
+    "drizzle": "Summons rain in battle.",
+    "speed boost": "Gradually boosts Speed.",
+    "battle armor": "Blocks critical hits.",
+    "sturdy": "Negates one-hit KO attacks.",
+    "damp": "Prevents self-destruction.",
+    "limber": "Prevents paralysis.",
+    "sand veil": "Raises evasion in a sandstorm.",
+    "static": "May paralyze on contact.",
+    "volt absorb": "Restores HP when hit by Electric moves.",
+    "water absorb": "Restores HP when hit by Water moves.",
+    "oblivious": "Prevents attraction.",
+    "cloud nine": "Negates weather effects.",
+    "compound eyes": "Raises accuracy.",
+    "insomnia": "Prevents sleep.",
+    "color change": "Changes type to the foe's move.",
+    "immunity": "Prevents poisoning.",
+    "flash fire": "Powers up Fire moves if hit by fire.",
+    "shield dust": "Prevents added effects.",
+    "own tempo": "Prevents confusion.",
+    "suction cups": "Firmly anchors the body.",
+    "intimidate": "Lowers the foe's Attack.",
+    "shadow tag": "Prevents the foe's escape.",
+    "rough skin": "Hurts foes on contact.",
+    "wonder guard": "Only super effective hits land.",
+    "levitate": "Avoids Ground attacks.",
+    "effect spore": "May inflict status on contact.",
+    "synchronize": "Passes on status problems.",
+    "clear body": "Prevents stat reduction.",
+    "natural cure": "Heals status when switching out.",
+    "lightning rod": "Draws Electric moves.",
+    "serene grace": "Boosts added effect chances.",
+    "swift swim": "Raises Speed in rain.",
+    "chlorophyll": "Raises Speed in sunshine.",
+    "illuminate": "Increases encounter rate.",
+    "trace": "Copies the foe's ability.",
+    "huge power": "Raises Attack.",
+    "poison point": "May poison on contact.",
+    "inner focus": "Prevents flinching.",
+    "magma armor": "Prevents freezing.",
+    "water veil": "Prevents burns.",
+    "magnet pull": "Traps Steel-type Pokemon.",
+    "soundproof": "Avoids sound-based moves.",
+    "rain dish": "Slight HP recovery in rain.",
+    "sand stream": "Summons a sandstorm.",
+    "pressure": "Raises the foe's PP usage.",
+    "thick fat": "Reduces Fire and Ice damage.",
+    "early bird": "Awakens quickly from sleep.",
+    "flame body": "May burn on contact.",
+    "run away": "Makes escaping easier.",
+    "keen eye": "Prevents accuracy loss.",
+    "hyper cutter": "Prevents Attack reduction.",
+    "pickup": "May pick up items.",
+    "truant": "Moves only every two turns.",
+    "hustle": "Trades accuracy for power.",
+    "cute charm": "May infatuate on contact.",
+    "plus": "Powers up with Minus.",
+    "minus": "Powers up with Plus.",
+    "forecast": "Changes with the weather.",
+    "sticky hold": "Prevents item theft.",
+    "shed skin": "May heal status each turn.",
+    "guts": "Raises Attack while suffering status.",
+    "marvel scale": "Raises Defense while suffering status.",
+    "liquid ooze": "Draining moves cause injury.",
+    "overgrow": "Powers up Grass moves in a pinch.",
+    "blaze": "Powers up Fire moves in a pinch.",
+    "torrent": "Powers up Water moves in a pinch.",
+    "swarm": "Powers up Bug moves in a pinch.",
+    "rock head": "Prevents recoil damage.",
+    "drought": "Summons sunlight in battle.",
+    "arena trap": "Prevents fleeing.",
+    "vital spirit": "Prevents sleep.",
+    "white smoke": "Prevents stat reduction.",
+    "pure power": "Raises Attack.",
+    "shell armor": "Blocks critical hits.",
+    "cacophony": "Boosts sound-based moves.",
+    "air lock": "Negates weather effects.",
+    "transistor": "Powers up Electric-type moves.",
+    "dragon s maw": "Powers up Dragon-type moves.",
+    "multitype": "Powers up type moves with held items.",
+    "pixilate": "Normal moves become Fairy.",
+  };
   const gen3SpecialTypes = new Set(["Fire", "Water", "Grass", "Electric", "Ice", "Psychic", "Dragon", "Dark"]);
   const dexBatchSize = 50;
   let dexVisibleCount = dexBatchSize;
@@ -162,11 +245,14 @@
       const caughtButton = event.target.closest("[data-caught]");
       if (caughtButton) {
         const name = caughtButton.dataset.caught;
+        const modalSpecies = caughtButton.closest("[data-species-modal]")?.dataset.speciesModal;
         state.caught[name] = !state.caught[name];
         persist();
         updateCounts();
         renderDex();
+        renderLocations();
         renderSave();
+        if (modalSpecies) openSpeciesModal(name);
         return;
       }
 
@@ -196,7 +282,15 @@
 
       const speciesJump = event.target.closest("[data-jump-species]");
       if (speciesJump) {
+        const fromModal = speciesJump.closest("[data-species-modal]");
         jumpToSpecies(speciesJump.dataset.jumpSpecies);
+        if (fromModal) closeModal();
+        return;
+      }
+
+      const speciesOpen = event.target.closest("[data-open-species]");
+      if (speciesOpen) {
+        openSpeciesModal(speciesOpen.dataset.openSpecies);
         return;
       }
 
@@ -508,7 +602,7 @@
         <div class="stat-bars">${statBars(entry.stats)}</div>
         <section class="dex-card-section">
           <h4>Abilities</h4>
-          <div class="chip-row">${abilities.length ? abilities.map((ability) => `<span class="chip">${text(ability)}</span>`).join("") : '<span class="chip">No ability listed</span>'}</div>
+          <div class="chip-row ability-row">${abilities.length ? abilities.map(renderAbilityButton).join("") : '<span class="chip">No ability listed</span>'}</div>
         </section>
         <section class="dex-card-section">
           <h4>Evolution</h4>
@@ -532,6 +626,16 @@
     const realAbilities = abilities.filter((ability) => normalize(ability) !== "none");
     if (realAbilities.length) return realAbilities;
     return abilities.length === 1 ? abilities : [];
+  }
+
+  function renderAbilityButton(ability) {
+    const detail = abilityDetails[normalize(ability)] || "No ability details listed.";
+    return `
+      <button class="ability-button" type="button" aria-label="${attr(`${ability}: ${detail}`)}">
+        <span>${text(ability)}</span>
+        <span class="ability-popover" role="tooltip">${text(detail)}</span>
+      </button>
+    `;
   }
 
   function resetDexLimit() {
@@ -610,6 +714,60 @@
           .join("")}
       </div>
     `;
+  }
+
+  function openSpeciesModal(name) {
+    const entry = speciesByName.get(name);
+    if (!entry || !els.modalRoot) return;
+    const caught = Boolean(state.caught[entry.name]);
+    const abilities = displayAbilities(entry);
+    els.modalRoot.innerHTML = `
+      <div class="modal-backdrop" data-close-modal></div>
+      <section class="modal-panel species-modal" role="dialog" aria-modal="true" aria-labelledby="species-modal-title" data-species-modal="${attr(entry.name)}">
+        <header class="modal-head species-modal-head">
+          <div class="species-modal-title">
+            ${sprite(entry)}
+            <div>
+              <div class="pokemon-metrics">
+                <span class="metric-badge"><small>Dex</small><strong>#${paddedDex(entry.dex)}</strong></span>
+                <span class="metric-badge"><small>BST</small><strong>${value(entry.bst)}</strong></span>
+              </div>
+              <h3 id="species-modal-title">${text(entry.name)}</h3>
+              <div class="type-row">${entry.types.map(typePill).join("")}</div>
+            </div>
+          </div>
+          <div class="species-modal-actions">
+            <button class="small-button caught-toggle ${caught ? "is-caught" : ""}" type="button" data-caught="${attr(entry.name)}">${caught ? "Caught" : "Mark caught"}</button>
+            <button class="icon-button" type="button" data-close-modal aria-label="Close Pokemon details">X</button>
+          </div>
+        </header>
+        <div class="species-modal-body">
+          <section class="species-panel">
+            <h4>Stats</h4>
+            <div class="stat-bars">${statBars(entry.stats)}</div>
+          </section>
+          <section class="species-panel">
+            <h4>Abilities</h4>
+            <div class="chip-row ability-row">${abilities.length ? abilities.map(renderAbilityButton).join("") : '<span class="chip">No ability listed</span>'}</div>
+          </section>
+          <section class="species-panel">
+            <h4>Evolution</h4>
+            ${renderEvolutionLinks(entry)}
+          </section>
+          <section class="species-panel">
+            <h4>Locations</h4>
+            ${renderAvailability(entry)}
+          </section>
+          <div class="dex-action-row species-modal-links">
+            <button class="chip-button" type="button" data-add-team="${attr(entry.name)}">Add to team</button>
+            <button class="chip-button" type="button" data-add-planner="${attr(entry.name)}">Plan</button>
+            <button class="chip-button primary-chip" type="button" data-open-moves="${attr(entry.name)}">Moves</button>
+            <button class="chip-button" type="button" data-jump-species="${attr(entry.name)}">Open in Dex</button>
+          </div>
+        </div>
+      </section>
+    `;
+    document.body.classList.add("modal-open");
   }
 
   function openMovesModal(name) {
@@ -755,7 +913,7 @@
                       <tr>
                         <td>${text(row.time)}</td>
                         <td>${text(method)}</td>
-                        <td>${encounters.map((encounter) => `<span class="chip">${text(encounter.species)} ${value(encounter.rate)}% Lv ${text(encounter.level)}</span>`).join(" ")}</td>
+                        <td><div class="encounter-list">${encounters.map(renderEncounterButton).join("")}</div></td>
                       </tr>
                     `,
                   ),
@@ -765,6 +923,21 @@
           </table>
         </div>
       </article>
+    `;
+  }
+
+  function renderEncounterButton(encounter) {
+    const entry = speciesByName.get(encounter.species);
+    const caught = Boolean(state.caught[encounter.species]);
+    return `
+      <button class="encounter-link ${caught ? "is-caught" : ""}" type="button" data-open-species="${attr(encounter.species)}">
+        ${miniSprite(entry)}
+        <span>
+          <strong>${text(encounter.species)}</strong>
+          <small>${value(encounter.rate)}% encounter / Lv ${text(encounter.level)}</small>
+        </span>
+        ${caught ? '<em>Caught</em>' : ""}
+      </button>
     `;
   }
 
@@ -791,7 +964,12 @@
             .map(
               (item) => `
                 <tr>
-                  <td><strong>${text(item.name)}</strong>${item.notes ? `<br><small>${text(item.notes)}</small>` : ""}</td>
+                  <td>
+                    <div class="item-cell">
+                      ${itemIcon(item)}
+                      <div><strong>${text(item.name)}</strong>${item.notes ? `<small>${text(item.notes)}</small>` : ""}</div>
+                    </div>
+                  </td>
                   <td>${text(item.type)}</td>
                   <td>${item.move ? `<button class="table-link" type="button" data-jump-move="${attr(item.move)}">${text(item.move)}</button>` : ""}</td>
                   <td>${text(item.locations || "")}</td>
@@ -802,6 +980,17 @@
             .join("")}
         </tbody>
       </table>
+    `;
+  }
+
+  function itemIcon(item) {
+    const code = item.id.replace(/-/g, "_");
+    const fallback = item.type === "TM" || item.type === "HM" ? item.type : item.type.slice(0, 2).toUpperCase();
+    return `
+      <span class="item-icon">
+        <span>${text(fallback)}</span>
+        <img src="assets/items/${attr(code)}.png" alt="" loading="lazy" onerror="this.remove()" />
+      </span>
     `;
   }
 
@@ -835,11 +1024,11 @@
         <button class="small-button" type="button" data-move-sections="collapse">Collapse all</button>
       </div>
       <details class="move-section" data-move-section>
-        <summary><span>Move catalogue</span><span class="chip">${filteredMoves.length}</span></summary>
+        <summary><span>Move catalogue</span><span class="section-count">${filteredMoves.length}</span></summary>
         ${renderMoveCatalogueTable(filteredMoves)}
       </details>
       <details class="move-section" data-move-section>
-        <summary><span>Tutor moves</span><span class="chip">${filteredTutors.length}</span></summary>
+        <summary><span>Tutor moves</span><span class="section-count">${filteredTutors.length}</span></summary>
         ${renderTutorMoveTable(filteredTutors)}
       </details>
     `;
@@ -869,7 +1058,7 @@
                 const move = moveByName.get(tutor.move);
                 return `
                   <tr>
-                    <td><button class="table-link" type="button" data-jump-move="${attr(tutor.move)}">${text(tutor.move)}</button></td>
+                    <td><strong>${text(tutor.move)}</strong></td>
                     <td>${move ? typePill(move.type) : ""}</td>
                     <td>${text(effectiveCategory(move))}</td>
                     <td>${value(move?.power)}</td>
@@ -925,9 +1114,12 @@
     return `
       <article class="trainer-card">
         <header>
-          <div>
-            <small class="muted">${text(trainer.category)}</small>
-            <h3>${text(trainer.name)}</h3>
+          <div class="trainer-heading">
+            ${trainerSprite(trainer)}
+            <div>
+              <small class="muted">${text(trainer.category)}</small>
+              <h3>${text(trainer.name)}</h3>
+            </div>
           </div>
           <div class="trainer-actions">
             <span class="chip">${trainer.team.length} Pokemon</span>
@@ -936,26 +1128,72 @@
         </header>
         <div class="trainer-team">
           ${trainer.team
-            .map(
-              (mon) => `
-                <div class="trainer-mon">
-                  <strong>${text(mon.species)}${mon.level ? ` Lv ${value(mon.level)}` : ""}</strong>
-                  ${mon.item ? `<small>Item: ${text(mon.item)}</small>` : ""}
-                  ${mon.moves.length ? `<div class="mini-list">${mon.moves.map((move) => `<span class="chip">${text(move)}</span>`).join("")}</div>` : ""}
-                </div>
-              `,
-            )
+            .map(renderTrainerMon)
             .join("")}
         </div>
       </article>
     `;
   }
 
-  function renderRules() {
-    els.rulesPanel.innerHTML = `
-      <label class="rule-toggle"><input type="checkbox" data-rule="fairy" ${state.rules.fairy ? "checked" : ""} /> Fairy type</label>
-      <label class="rule-toggle"><input type="checkbox" data-rule="physicalSplit" ${state.rules.physicalSplit ? "checked" : ""} /> Physical/special split</label>
+  function renderTrainerMon(mon) {
+    const entry = speciesByName.get(mon.species);
+    return `
+      <div class="trainer-mon">
+        ${miniSprite(entry)}
+        <div>
+          <strong>${text(mon.species)}${mon.level ? ` Lv ${value(mon.level)}` : ""}</strong>
+          ${entry ? `<div class="type-row">${entry.types.map(typePill).join("")}</div>` : ""}
+          ${mon.item ? `<small>Item: ${text(mon.item)}</small>` : ""}
+          ${mon.moves.length ? `<div class="mini-list">${mon.moves.map((move) => `<span class="chip">${text(move)}</span>`).join("")}</div>` : ""}
+        </div>
+      </div>
     `;
+  }
+
+  function trainerSprite(trainer) {
+    const path = trainerSpritePath(trainer);
+    const initials = String(trainer.name || "?")
+      .replace(/[_-]+/g, " ")
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((part) => part.charAt(0))
+      .join("")
+      .toUpperCase();
+    return `
+      <span class="trainer-avatar">
+        <span>${text(initials || "?")}</span>
+        ${path ? `<img src="${attr(path)}" alt="" loading="lazy" onerror="this.remove()" />` : ""}
+      </span>
+    `;
+  }
+
+  function trainerSpritePath(trainer) {
+    const category = normalize(trainer.category);
+    const rawName = String(trainer.name || "").split("\n")[0].split(" - ")[0].trim();
+    const baseName = rawName
+      .replace(/^Rival_.+$/i, "Rival")
+      .replace(/_?\d+$/g, "")
+      .replace(/_+/g, " ")
+      .trim();
+    const slug = slugify(baseName);
+    const special = {
+      blue: "leader_blue",
+      ltsurge: "surge",
+      lt_surge: "surge",
+      lance: category.includes("league") ? "champion_lance" : "lance",
+      rival: "silver",
+    };
+    const file =
+      special[slug] ||
+      (category.includes("gym") && !["brock", "misty", "erika", "janine", "sabrina", "blaine"].includes(slug) ? `leader_${slug}` : "") ||
+      (category.includes("league") ? `elite_four_${slug}` : "") ||
+      slug;
+    return file ? `assets/trainers/${file}.png` : "";
+  }
+
+  function renderRules() {
+    els.rulesPanel.innerHTML = "";
   }
 
   function renderTeam() {
@@ -965,7 +1203,7 @@
   function renderTeamSlot(slot, index) {
     const entry = speciesByName.get(slot.species);
     const moveChoices = entry ? compatibleMoves(entry) : [];
-    const abilityOptions = ["", ...(entry?.abilities || [])].map((ability) => option(ability, ability || "Ability")).join("");
+    const abilityOptions = ["", ...(entry ? displayAbilities(entry) : [])].map((ability) => option(ability, ability || "Ability")).join("");
     return `
       <article class="slot-card">
         <header>
@@ -2059,6 +2297,10 @@
 
   function normalize(value) {
     return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  }
+
+  function slugify(value) {
+    return normalize(value).replace(/\s+/g, "_");
   }
 
   function value(input) {
