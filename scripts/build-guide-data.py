@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import json
 import re
 import shutil
@@ -92,6 +93,96 @@ def make_id(value):
     text = text.replace("&", "and")
     text = re.sub(r"[^a-z0-9]+", "-", text)
     return text.strip("-")
+
+
+def lookup_key(value):
+    return re.sub(r"[^a-z0-9]+", "", str(value or "").lower())
+
+
+def clean_game_text(value):
+    text = str(value or "")
+    replacements = {
+        "POKÃ©MON": "Pokemon",
+        "POKéMON": "Pokemon",
+        "POKEMON": "Pokemon",
+        "POKÃ©": "Poke",
+        "POKé": "Poke",
+        "POKe": "Poke",
+        "DEFENSE": "Defense",
+        "ATTACK": "Attack",
+        "SP. ATK": "Sp. Atk",
+        "SP. DEF": "Sp. Def",
+        "SPEED": "Speed",
+        "ACCURACY": "Accuracy",
+    }
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+    text = re.sub(r"\{[^}]+\}", "", text)
+    text = text.replace("\n", " ")
+    text = re.sub(r"\s+", " ", text)
+    text = re.sub(r"(?<=\w)-\s+(?=\w)", "-", text)
+    return text.strip()
+
+
+def extract_c_string_literals(body):
+    parts = []
+    for token in re.findall(r'"(?:\\.|[^"\\])*"', body):
+        try:
+            parts.append(ast.literal_eval(token))
+        except Exception:
+            parts.append(token.strip('"').replace("\\n", "\n"))
+    return clean_game_text("".join(parts))
+
+
+def parse_description_symbols(path):
+    if not path.exists():
+        return {}
+    text = path.read_text(encoding="utf-8", errors="replace")
+    descriptions = {}
+    pattern = re.compile(r"static\s+const\s+u8\s+(s\w+)\[\]\s*=\s*_\(\s*((?:\s*\"(?:\\.|[^\"\\])*\"\s*)+)\);", re.S)
+    for symbol, body in pattern.findall(text):
+        descriptions[symbol] = extract_c_string_literals(body)
+    return descriptions
+
+
+def parse_move_descriptions(source_root):
+    path = source_root / "src" / "data" / "text" / "move_descriptions.h"
+    if not path.exists():
+        return {}
+    descriptions = parse_description_symbols(path)
+    text = path.read_text(encoding="utf-8", errors="replace")
+    moves = {}
+    for const_name, symbol in re.findall(r"\[(MOVE_[A-Z0-9_]+)\s*-\s*1\]\s*=\s*(s\w+)", text):
+        description = descriptions.get(symbol)
+        if not description:
+            continue
+        raw_name = const_name.removeprefix("MOVE_").replace("_", " ")
+        moves[lookup_key(raw_name)] = description
+    return moves
+
+
+def parse_item_descriptions(source_root):
+    text_path = source_root / "src" / "data" / "text" / "item_descriptions.h"
+    items_path = source_root / "src" / "data" / "items.h"
+    if not text_path.exists() or not items_path.exists():
+        return {}
+    descriptions = parse_description_symbols(text_path)
+    text = items_path.read_text(encoding="utf-8", errors="replace")
+    items = {}
+    block_pattern = re.compile(r"\[(ITEM_[A-Z0-9_]+)\]\s*=\s*\{(.*?)\n\s*\},", re.S)
+    for const_name, body in block_pattern.findall(text):
+        name_match = re.search(r"\.name\s*=\s*_\(\"((?:\\.|[^\"])*)\"\)", body)
+        desc_match = re.search(r"\.description\s*=\s*(s\w+)", body)
+        if not desc_match:
+            continue
+        description = descriptions.get(desc_match.group(1))
+        if not description or description == "?????":
+            continue
+        if name_match:
+            items[lookup_key(clean_game_text(name_match.group(1)))] = description
+        raw_name = const_name.removeprefix("ITEM_").replace("_", " ")
+        items[lookup_key(raw_name)] = description
+    return items
 
 
 def sprite_slug(species_name):
@@ -365,7 +456,7 @@ def build_static(wb, species_by_name):
     return rows
 
 
-def build_items(wb):
+def build_items(wb, item_descriptions, move_descriptions):
     ws = wb["Items, TMs, HMs"]
     items = []
     for row in sheet_rows(ws):
@@ -373,16 +464,28 @@ def build_items(wb):
             continue
         if not row[0]:
             continue
+        item_name = row[0]
+        machine_code = str(item_name).split()[0] if re.match(r"^(?:TM|HM)\d+", str(item_name), flags=re.I) else ""
+        move_name = row[2]
+        description = (
+            item_descriptions.get(lookup_key(item_name))
+            or item_descriptions.get(lookup_key(machine_code))
+            or None
+        )
+        if move_name and not description:
+            move_description = move_descriptions.get(lookup_key(move_name))
+            description = clean_game_text(f"Teaches {move_name}. {move_description}" if move_description else f"Teaches {move_name}.")
         items.append(
             {
-                "id": make_id(row[0]),
-                "name": row[0],
+                "id": make_id(item_name),
+                "name": item_name,
                 "type": row[1],
-                "move": row[2],
+                "move": move_name,
                 "locations": row[3],
                 "wildCommonSpecies": split_semicolon(row[4]),
                 "wildRareSpecies": split_semicolon(row[5]),
                 "notes": row[6],
+                "description": description,
             }
         )
     return items
@@ -443,7 +546,7 @@ def build_learnsets(wb, species_by_name):
     return learnsets
 
 
-def build_moves(wb):
+def build_moves(wb, move_descriptions):
     ws = wb["Moves"]
     moves = []
     for row in sheet_rows(ws):
@@ -463,6 +566,7 @@ def build_moves(wb):
                 "priority": row[8],
                 "category": row[9],
                 "flags": row[10],
+                "description": move_descriptions.get(lookup_key(row[0])),
             }
         )
     return moves
@@ -500,12 +604,14 @@ def build_simple_table(wb, sheet_name, headers, min_row=4):
 def build_data(workbook_path, source_root):
     wb = openpyxl.load_workbook(workbook_path, read_only=False, data_only=False)
     art = copy_art(source_root)
+    move_descriptions = parse_move_descriptions(source_root)
+    item_descriptions = parse_item_descriptions(source_root)
     species, species_by_name = build_species(wb, source_root)
     locations = build_locations(wb, species_by_name)
     static_pokemon = build_static(wb, species_by_name)
     evolutions, breeding = build_evolutions_and_breeding(wb, species_by_name)
     learnsets = build_learnsets(wb, species_by_name)
-    moves = build_moves(wb)
+    moves = build_moves(wb, move_descriptions)
     data = {
         "meta": {
             "title": "Pokemon Heart & Soul Field Guide",
@@ -519,7 +625,7 @@ def build_data(workbook_path, source_root):
         "species": species,
         "locations": locations,
         "staticPokemon": static_pokemon,
-        "items": build_items(wb),
+        "items": build_items(wb, item_descriptions, move_descriptions),
         "evolutions": evolutions,
         "breeding": breeding,
         "learnsets": learnsets,

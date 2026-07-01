@@ -15,9 +15,10 @@
   const syncDeviceKey = "heart-soul-field-guide-sync-device-v1";
   const syncEndpoint = (window.HEART_SOUL_SYNC_ENDPOINT || "").replace(/\/+$/, "");
   const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  const appShellVersion = "heart-soul-field-guide-v6";
+  const appShellVersion = "heart-soul-field-guide-v7";
   const species = [...data.species].sort((a, b) => Number(a.dex || 0) - Number(b.dex || 0));
   const speciesByName = new Map(species.map((entry) => [entry.name, entry]));
+  const speciesByLookup = new Map(species.map((entry) => [normalize(entry.name), entry]));
   const moveByName = new Map(data.moves.map((move) => [move.name, move]));
   const itemsByName = new Map(data.items.map((item) => [item.name, item]));
   const itemsByMove = new Map();
@@ -292,6 +293,15 @@
         return;
       }
 
+      const teamSpeciesOption = event.target.closest("[data-team-species-option]");
+      if (teamSpeciesOption) {
+        event.preventDefault();
+        selectTeamSpecies(Number(teamSpeciesOption.dataset.teamSlot), teamSpeciesOption.dataset.teamSpeciesOption);
+        return;
+      }
+
+      if (!event.target.closest(".species-search-field")) hideTeamSpeciesSuggestions();
+
       const caughtButton = event.target.closest("[data-caught]");
       if (caughtButton) {
         const name = caughtButton.dataset.caught;
@@ -485,7 +495,16 @@
 
     document.addEventListener("input", handleInput);
     document.addEventListener("change", handleChange);
+    document.addEventListener("focusin", handleFocusIn);
     document.addEventListener("keydown", (event) => {
+      if (event.target.matches("[data-team-species]") && event.key === "Enter") {
+        const match = teamSpeciesMatches(event.target.value)[0];
+        if (match) {
+          event.preventDefault();
+          selectTeamSpecies(Number(event.target.dataset.teamSpecies), match.name);
+        }
+        return;
+      }
       if (event.key === "Escape") closeModal();
     });
     if (window.addEventListener) {
@@ -517,16 +536,14 @@
     } else if (target.matches("#trainer-search")) {
       filters.trainerSearch = target.value;
       renderTrainers();
+    } else if (target.matches("[data-team-species]")) {
+      updateTeamSpeciesSuggestions(target);
     } else if (target.matches("[data-team-nickname]")) {
       const index = Number(target.dataset.teamNickname);
       state.team[index].nickname = cleanTeamNickname(target.value);
       persist();
       renderTeamOverview();
       renderSave();
-    } else if (target.matches("[data-team-item]") && target.value === "") {
-      const index = Number(target.dataset.teamItem);
-      state.team[index].item = "";
-      persistAndRenderTeam();
     } else if (target.matches("[data-planner-note]")) {
       const index = Number(target.dataset.plannerNote);
       state.planner[index].note = target.value;
@@ -580,24 +597,7 @@
       renderBattlePlanner();
       renderSave();
     } else if (target.matches("[data-team-species]")) {
-      const index = Number(target.dataset.teamSpecies);
-      const entry = speciesByName.get(target.value);
-      const current = state.team[index] || blankTeamSlot();
-      const caughtChanged = entry ? maybeMarkCaughtForTeam(entry) : false;
-      state.team[index] = {
-        species: entry ? entry.name : "",
-        ability: entry ? defaultAbility(entry) : "",
-        moves: ["", "", "", ""],
-        nature: current.nature || "",
-        item: current.item || "",
-        nickname: current.nickname || "",
-      };
-      persistAndRenderTeam();
-      if (caughtChanged) {
-        updateCounts();
-        renderDex();
-        renderLocations();
-      }
+      selectTeamSpecies(Number(target.dataset.teamSpecies), target.value, { allowClear: true });
     } else if (target.matches("[data-team-ability]")) {
       state.team[Number(target.dataset.teamAbility)].ability = target.value;
       persist();
@@ -607,8 +607,7 @@
       state.team[Number(target.dataset.teamNature)].nature = naturesByName.has(target.value) ? target.value : "";
       persistAndRenderTeam();
     } else if (target.matches("[data-team-item]")) {
-      state.team[Number(target.dataset.teamItem)].item = itemsByName.has(target.value) ? target.value : "";
-      persistAndRenderTeam();
+      updateTeamItem(Number(target.dataset.teamItem), target.value, target);
     } else if (target.matches("[data-team-move]")) {
       const index = Number(target.dataset.teamSlot);
       const moveIndex = Number(target.dataset.teamMove);
@@ -646,6 +645,11 @@
       importSave(target.files?.[0]);
       target.value = "";
     }
+  }
+
+  function handleFocusIn(event) {
+    const target = event.target;
+    if (target.matches("[data-team-species]")) updateTeamSpeciesSuggestions(target);
   }
 
   function renderControls() {
@@ -1021,7 +1025,7 @@
         <td>${text(effectiveCategory(move))}</td>
         <td>${value(move.power)}</td>
         <td>${value(move.accuracy)}</td>
-        <td>${text(joinParts([move.effect, move.flags]) || "No additional effect listed.")}</td>
+        <td>${text(moveDescription(move))}</td>
       </tr>
     `;
   }
@@ -1152,6 +1156,7 @@
         item.locations,
         item.wildCommonSpecies.join(" "),
         item.wildRareSpecies.join(" "),
+        item.description,
         item.notes,
       ].join(" "));
       return (!query || haystack.includes(query)) && (!filters.itemType || item.type === filters.itemType);
@@ -1159,7 +1164,7 @@
     els.itemCount.textContent = `Showing ${filtered.length} of ${data.items.length}`;
     els.itemTable.innerHTML = `
       <table class="data-table">
-        <thead><tr><th>Item</th><th>Type</th><th>Move</th><th>Locations</th><th>Held by</th></tr></thead>
+        <thead><tr><th>Item</th><th>Description</th><th>Type</th><th>Move</th><th>Locations</th><th>Held by</th></tr></thead>
         <tbody>
           ${filtered
             .map(
@@ -1171,6 +1176,7 @@
                       <div><strong>${text(item.name)}</strong>${item.notes ? `<small>${text(item.notes)}</small>` : ""}</div>
                     </div>
                   </td>
+                  <td>${text(itemDescription(item))}</td>
                   <td>${text(item.type)}</td>
                   <td>${item.move ? `<button class="table-link" type="button" data-jump-move="${attr(item.move)}">${text(item.move)}</button>` : ""}</td>
                   <td>${text(item.locations || "")}</td>
@@ -1200,7 +1206,7 @@
     const tutorMoveNames = new Set(data.tutors.map((tutor) => tutor.move));
     const filteredMoves = data.moves.filter((move) => {
       const displayCategory = effectiveCategory(move);
-      const haystack = normalize([move.name, move.effect, move.flags, displayCategory, move.type].join(" "));
+      const haystack = normalize([move.name, move.description, move.effect, move.flags, displayCategory, move.type].join(" "));
       return (
         (!query || haystack.includes(query)) &&
         (!filters.moveType || move.type === filters.moveType) &&
@@ -1211,7 +1217,7 @@
     const filteredTutors = data.tutors.filter((tutor) => {
       const move = moveByName.get(tutor.move);
       const displayCategory = effectiveCategory(move);
-      const haystack = normalize([tutor.move, tutor.location, tutor.cost, move?.effect, move?.flags, displayCategory, move?.type].join(" "));
+      const haystack = normalize([tutor.move, tutor.location, tutor.cost, move?.description, move?.effect, move?.flags, displayCategory, move?.type].join(" "));
       return (
         (!query || haystack.includes(query)) &&
         (!filters.moveType || move?.type === filters.moveType) &&
@@ -1266,7 +1272,7 @@
                     <td>${value(move?.accuracy)}</td>
                     <td>${text(tutor.location || "Unknown")}</td>
                     <td>${text(tutor.cost || "None listed")}</td>
-                    <td>${text(joinParts([move?.effect, move?.flags]) || "No additional effect listed.")}</td>
+                    <td>${text(moveDescription(move))}</td>
                   </tr>
                 `;
               })
@@ -1286,9 +1292,14 @@
         <td>${value(move.power)}</td>
         <td>${value(move.accuracy)}</td>
         <td>${value(move.pp)}</td>
-        <td>${text(joinParts([move.effect, move.flags]))}</td>
+        <td>${text(moveDescription(move))}</td>
       </tr>
     `;
+  }
+
+  function moveDescription(move) {
+    if (!move) return "No move details listed.";
+    return move.description || joinParts([move.effect, move.flags]) || "No additional effect listed.";
   }
 
   function setMoveSectionsOpen(open) {
@@ -1399,7 +1410,6 @@
 
   function renderTeam() {
     els.teamGrid.innerHTML = `
-      <datalist id="team-species-list">${species.map((entry) => `<option value="${attr(entry.name)}"></option>`).join("")}</datalist>
       <datalist id="team-item-list">${data.items.map((item) => `<option value="${attr(item.name)}"></option>`).join("")}</datalist>
       ${renderTeamOffensiveSummary()}
       ${state.team.map((slot, index) => renderTeamSlot(slot, index)).join("")}
@@ -1425,7 +1435,11 @@
         }
         <div class="slot-body">
           <div class="team-field-grid">
-            <label class="field"><span>Pokemon</span><input data-team-species="${index}" list="team-species-list" value="${attr(slot.species)}" placeholder="Search Pokemon" autocomplete="off" /></label>
+            <div class="field species-search-field">
+              <span>Pokemon</span>
+              <input data-team-species="${index}" value="${attr(slot.species)}" placeholder="Search Pokemon" autocomplete="off" aria-autocomplete="list" aria-controls="team-species-suggestions-${index}" />
+              <div class="species-suggestion-box" id="team-species-suggestions-${index}" data-team-species-suggestions="${index}" hidden></div>
+            </div>
             <label class="field"><span>Nickname</span><input data-team-nickname="${index}" value="${attr(slot.nickname || "")}" maxlength="32" placeholder="Optional nickname" /></label>
             <label class="field"><span>Nature</span><select data-team-nature="${index}">${natureOptions(slot.nature)}</select></label>
             <label class="field"><span>Ability</span><select data-team-ability="${index}" ${entry ? "" : "disabled"}>${abilityOptions}</select></label>
@@ -1433,7 +1447,6 @@
           </div>
           ${renderTeamItemSummary(item)}
           ${entry ? renderTeamStats(entry, slot.nature) : ""}
-          ${entry ? renderEvolutionControls(entry, index) : ""}
           <div class="move-grid">
             ${[0, 1, 2, 3]
               .map(
@@ -1448,6 +1461,7 @@
               )
               .join("")}
           </div>
+          ${entry ? renderEvolutionControls(entry, index) : ""}
         </div>
       </article>
     `;
@@ -1512,11 +1526,101 @@
     return abilities.map((ability) => option(ability.name, ability.hidden ? `${ability.name} (HA)` : ability.name, selectedAbility === ability.name)).join("");
   }
 
+  function selectTeamSpecies(index, rawName, { allowClear = false } = {}) {
+    const name = String(rawName || "").trim();
+    const entry = speciesByName.get(name) || speciesByLookup.get(normalize(name));
+    if (!entry) {
+      if (allowClear && !name) {
+        const current = state.team[index] || blankTeamSlot();
+        state.team[index] = { ...blankTeamSlot(), nature: current.nature || "", item: current.item || "", nickname: current.nickname || "" };
+        persistAndRenderTeam();
+      }
+      return;
+    }
+    const current = state.team[index] || blankTeamSlot();
+    const caughtChanged = maybeMarkCaughtForTeam(entry);
+    state.team[index] = {
+      species: entry.name,
+      ability: defaultAbility(entry),
+      moves: ["", "", "", ""],
+      nature: current.nature || "",
+      item: current.item || "",
+      nickname: current.nickname || "",
+    };
+    persistAndRenderTeam();
+    if (caughtChanged) {
+      updateCounts();
+      renderDex();
+      renderLocations();
+    }
+  }
+
+  function updateTeamSpeciesSuggestions(target) {
+    const panel = target.closest(".species-search-field")?.querySelector("[data-team-species-suggestions]");
+    if (!panel) return;
+    const index = Number(target.dataset.teamSpecies);
+    const matches = teamSpeciesMatches(target.value);
+    panel.hidden = false;
+    panel.innerHTML = renderTeamSpeciesSuggestions(matches, index, target.value);
+  }
+
+  function hideTeamSpeciesSuggestions() {
+    document.querySelectorAll("[data-team-species-suggestions]").forEach((panel) => {
+      panel.hidden = true;
+      panel.innerHTML = "";
+    });
+  }
+
+  function teamSpeciesMatches(query) {
+    const needle = normalize(query);
+    const candidates = needle
+      ? species.filter((entry) => normalize(entry.name).includes(needle))
+      : species.slice(0, 8);
+    return candidates
+      .sort((a, b) => {
+        const aName = normalize(a.name);
+        const bName = normalize(b.name);
+        const aStarts = needle && aName.startsWith(needle) ? 0 : 1;
+        const bStarts = needle && bName.startsWith(needle) ? 0 : 1;
+        return aStarts - bStarts || Number(a.dex || 0) - Number(b.dex || 0);
+      })
+      .slice(0, 8);
+  }
+
+  function renderTeamSpeciesSuggestions(matches, index, query) {
+    if (!matches.length) {
+      return `<div class="species-suggestion-empty">No Pokemon match ${text(query || "that search")}.</div>`;
+    }
+    return matches
+      .map(
+        (entry) => `
+          <button class="species-suggestion" type="button" data-team-slot="${index}" data-team-species-option="${attr(entry.name)}">
+            ${miniSprite(entry)}
+            <span>
+              <strong>${text(entry.name)}</strong>
+              <small>${text(entry.types.join(" / ") || "No type listed")}</small>
+            </span>
+          </button>
+        `,
+      )
+      .join("");
+  }
+
+  function updateTeamItem(index, itemName, target) {
+    const item = itemsByName.get(itemName);
+    state.team[index].item = item ? item.name : "";
+    if (!item && target) target.value = "";
+    persist();
+    const summary = target?.closest(".slot-card")?.querySelector("[data-team-item-summary]");
+    if (summary) summary.outerHTML = renderTeamItemSummary(item);
+    renderSave();
+  }
+
   function renderTeamItemSummary(item) {
-    if (!item) return '<div class="held-item-summary is-empty"><span class="muted">No held item selected.</span></div>';
+    if (!item) return '<div class="held-item-summary is-empty" data-team-item-summary><span class="muted">No held item selected.</span></div>';
     const details = itemDescription(item);
     return `
-      <div class="held-item-summary">
+      <div class="held-item-summary" data-team-item-summary>
         ${itemIcon(item)}
         <div>
           <strong>${text(item.name)}</strong>
@@ -1527,7 +1631,7 @@
   }
 
   function itemDescription(item) {
-    return joinParts([item.notes, item.move ? `Teaches ${item.move}` : ""]) || item.type || "No item description listed.";
+    return item?.description || item?.notes || (item?.move ? `Teaches ${item.move}.` : "") || item?.type || "No item description listed.";
   }
 
   function renderTeamMoveSummary(moveName) {
@@ -1541,7 +1645,7 @@
           <span class="chip">Power ${value(move.power)}</span>
           <span class="chip">Acc ${value(move.accuracy)}</span>
         </div>
-        <p>${text(joinParts([move.effect, move.flags]) || "No additional effect listed.")}</p>
+        <p>${text(moveDescription(move))}</p>
       </div>
     `;
   }

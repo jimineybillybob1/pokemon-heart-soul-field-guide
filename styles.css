@@ -1296,6 +1296,7 @@ summary {
 .slot-body {
   display: grid;
   gap: 10px;
+  height: 100%;
 }
 
 .slot-card .field {
@@ -1313,6 +1314,81 @@ summary {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+  align-items: end;
+}
+
+.species-search-field {
+  min-width: 0;
+}
+
+.species-suggestion-box {
+  display: grid;
+  gap: 6px;
+  max-height: 254px;
+  overflow: auto;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--surface-2) 92%, var(--surface));
+}
+
+.species-suggestion-box[hidden] {
+  display: none;
+}
+
+.species-suggestion {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 5px 7px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+}
+
+.species-suggestion:hover,
+.species-suggestion:focus-visible {
+  border-color: var(--accent-3);
+  background: color-mix(in srgb, var(--accent-3) 11%, var(--surface));
+}
+
+.species-suggestion .mini-sprite {
+  width: 34px;
+  height: 34px;
+}
+
+.species-suggestion .mini-sprite img {
+  width: 30px;
+  height: 30px;
+}
+
+.species-suggestion strong,
+.species-suggestion small {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.species-suggestion strong {
+  font-size: 0.9rem;
+}
+
+.species-suggestion small,
+.species-suggestion-empty {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.species-suggestion-empty {
+  padding: 8px;
 }
 
 .team-item-field {
@@ -1334,16 +1410,19 @@ summary {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+  align-items: stretch;
 }
 
 .move-field {
   min-width: 0;
   display: grid;
+  grid-template-rows: auto minmax(78px, 1fr);
   gap: 6px;
 }
 
 .team-move-summary {
-  min-height: 78px;
+  min-height: 88px;
+  height: 100%;
   display: grid;
   align-content: start;
   gap: 6px;
@@ -1436,6 +1515,7 @@ summary {
   display: grid;
   gap: 8px;
   padding: 10px;
+  margin-top: auto;
 }
 
 .team-stat-panel header {

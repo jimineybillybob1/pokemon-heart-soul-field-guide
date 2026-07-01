@@ -189,10 +189,14 @@ const checks = {
     speciesModalApp.elementFor("#modal-root").innerHTML.includes("Mark caught") &&
     speciesModalApp.elementFor("#modal-root").innerHTML.includes("Powers up Grass moves"),
   itemIconsRendered: defaultApp.elementFor("#item-table").innerHTML.includes("item-icon") && defaultApp.elementFor("#item-table").innerHTML.includes("assets/items/fire_stone.png"),
+  itemDescriptionsRendered:
+    defaultApp.elementFor("#item-table").innerHTML.includes("Description") &&
+    defaultApp.elementFor("#item-table").innerHTML.includes("Makes certain species of Pokemon evolve."),
   movesModalRendered:
     defaultApp.elementFor("#modal-root").innerHTML.includes("Bulbasaur Moves") &&
     defaultApp.elementFor("#modal-root").innerHTML.includes("Vine Whip") &&
-    defaultApp.elementFor("#modal-root").innerHTML.includes("data-jump-item"),
+    defaultApp.elementFor("#modal-root").innerHTML.includes("data-jump-item") &&
+    defaultApp.elementFor("#modal-root").innerHTML.includes("Strikes the foe with slender, whiplike vines."),
   movesTabHasTutorSection:
     defaultApp.elementFor("#move-table").innerHTML.includes("Tutor moves") &&
     defaultApp.elementFor("#move-table").innerHTML.includes("Requirement") &&
@@ -203,7 +207,8 @@ const checks = {
   trainerSpritesRendered: defaultApp.elementFor("#trainer-list").innerHTML.includes("trainer-avatar") && defaultApp.elementFor("#trainer-list").innerHTML.includes("mini-sprite"),
   teamSlotsRendered: (defaultApp.elementFor("#team-grid").innerHTML.match(/Slot /g) || []).length,
   teamBuilderEnhanced:
-    defaultApp.elementFor("#team-grid").innerHTML.includes("list=\"team-species-list\"") &&
+    defaultApp.elementFor("#team-grid").innerHTML.includes("data-team-species-suggestions") &&
+    defaultApp.elementFor("#team-grid").innerHTML.includes("aria-autocomplete=\"list\"") &&
     defaultApp.elementFor("#team-grid").innerHTML.includes("list=\"team-item-list\"") &&
     defaultApp.elementFor("#team-grid").innerHTML.includes("Nickname") &&
     defaultApp.elementFor("#team-grid").innerHTML.includes("Held item") &&
@@ -216,7 +221,12 @@ const checks = {
     bossApp.elementFor("#team-grid").innerHTML.includes("Power") &&
     bossApp.elementFor("#team-grid").innerHTML.includes("Acc") &&
     bossApp.elementFor("#team-grid").innerHTML.includes("Fire Stone") &&
+    bossApp.elementFor("#team-grid").innerHTML.includes("Makes certain species of Pokemon evolve.") &&
+    bossApp.elementFor("#team-grid").innerHTML.includes("Charges the foe with a full-body tackle.") &&
+    bossApp.elementFor("#team-grid").innerHTML.includes("Strikes the foe with slender, whiplike vines.") &&
+    bossApp.elementFor("#team-grid").innerHTML.includes("data-team-item-summary") &&
     !bossApp.elementFor("#team-grid").innerHTML.includes("Found:") &&
+    !bossApp.elementFor("#team-grid").innerHTML.includes("Protect Affected") &&
     !bossApp.elementFor("#team-grid").innerHTML.includes(">Ability</option>"),
   teamOverviewRendered: defaultApp.elementFor("#team-overview").innerHTML.includes("team-overview-slot"),
   teamRulesRemoved: !defaultApp.elementFor("#rules-panel").innerHTML.includes("Fairy type") && !defaultApp.elementFor("#rules-panel").innerHTML.includes("physical/special split"),
@@ -250,6 +260,7 @@ if (
   !checks.locationsHaveClickableSpriteEncounters ||
   !checks.speciesModalRendered ||
   !checks.itemIconsRendered ||
+  !checks.itemDescriptionsRendered ||
   !checks.movesModalRendered ||
   !checks.movesTabHasTutorSection ||
   !checks.movesTabTutorRowsPlain ||
