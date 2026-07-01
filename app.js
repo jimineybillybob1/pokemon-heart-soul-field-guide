@@ -362,7 +362,10 @@
         <div class="pokemon-head">
           ${sprite(entry)}
           <div class="pokemon-title">
-            <small>#${value(entry.dex)} / BST ${value(entry.bst)}</small>
+            <div class="pokemon-metrics">
+              <span class="metric-badge"><small>Dex</small><strong>#${paddedDex(entry.dex)}</strong></span>
+              <span class="metric-badge"><small>BST</small><strong>${value(entry.bst)}</strong></span>
+            </div>
             <h3>${text(entry.name)}</h3>
             <div class="type-row">${entry.types.map(typePill).join("")}</div>
           </div>
@@ -1003,6 +1006,12 @@
     return [option("", "Choose Pokemon"), ...species.map((entry) => option(entry.name, `#${entry.dex} ${entry.name}`, selected === entry.name))].join("");
   }
 
+  function paddedDex(input) {
+    const number = Number(input);
+    if (!Number.isFinite(number)) return value(input);
+    return String(number).padStart(3, "0");
+  }
+
   function moveSelect(moves, selected) {
     return [option("", "Choose move"), ...moves.map((move) => option(move, move, selected === move))].join("");
   }
@@ -1088,4 +1097,3 @@
     return text(input);
   }
 })();
-

@@ -404,6 +404,8 @@ textarea {
 }
 
 .pokemon-title {
+  display: grid;
+  gap: 6px;
   min-width: 0;
 }
 
@@ -420,6 +422,38 @@ textarea {
 .pokemon-title small,
 .muted {
   color: var(--muted);
+}
+
+.pokemon-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.metric-badge {
+  display: inline-grid;
+  grid-template-columns: auto auto;
+  align-items: baseline;
+  gap: 5px;
+  min-height: 30px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 4px 8px;
+  background: color-mix(in srgb, var(--accent-3) 10%, var(--surface));
+}
+
+.metric-badge small {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.metric-badge strong {
+  color: var(--ink);
+  font-size: 1rem;
+  line-height: 1;
 }
 
 .type-row,
@@ -802,4 +836,3 @@ summary {
     grid-template-columns: 1fr;
   }
 }
-

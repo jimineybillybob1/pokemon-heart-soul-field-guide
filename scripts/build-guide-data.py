@@ -46,6 +46,13 @@ def compact(value):
     return value
 
 
+def numeric_or_none(value):
+    value = compact(value)
+    if isinstance(value, (int, float)):
+        return value
+    return None
+
+
 def clean_type(value):
     value = compact(value)
     return TYPE_FIXES.get(value, value)
@@ -226,6 +233,8 @@ def build_species(wb, source_root):
         type1 = clean_type(row[9])
         type2 = clean_type(row[10])
         types = [type1] if type1 == type2 or not type2 else [type1, type2]
+        stat_values = [numeric_or_none(value) or 0 for value in row[3:9]]
+        bst = numeric_or_none(row[2]) or sum(stat_values)
         abilities = []
         for ability in [row[26], row[27], row[28]]:
             if ability and ability not in abilities:
@@ -236,7 +245,7 @@ def build_species(wb, source_root):
             "id": make_id(name),
             "name": name,
             "dex": row[1],
-            "bst": row[2] or sum(value or 0 for value in row[3:9]),
+            "bst": bst,
             "stats": {
                 "hp": row[3],
                 "atk": row[4],
