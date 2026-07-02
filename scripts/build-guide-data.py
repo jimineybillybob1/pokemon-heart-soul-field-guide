@@ -158,6 +158,8 @@ def parse_move_descriptions(source_root):
             continue
         raw_name = const_name.removeprefix("MOVE_").replace("_", " ")
         moves[lookup_key(raw_name)] = description
+    if "faintattack" in moves:
+        moves["feintattack"] = moves["faintattack"]
     return moves
 
 

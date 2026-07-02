@@ -4,6 +4,8 @@ import vm from "node:vm";
 
 const dataScript = fs.readFileSync("data/heart-soul-data.js", "utf8");
 const appScript = fs.readFileSync("app.js", "utf8");
+const styleSheet = fs.readFileSync("styles.css", "utf8");
+const indexHtml = fs.readFileSync("index.html", "utf8");
 const saveKey = "heart-soul-field-guide-save-v1";
 
 class FakeClassList {
@@ -24,9 +26,16 @@ class FakeElement {
     this.checked = false;
     this.textContent = "";
     this.innerHTML = "";
+    this.attributes = {};
   }
 
   addEventListener() {}
+  setAttribute(name, value) {
+    this.attributes[name] = String(value);
+  }
+  getAttribute(name) {
+    return this.attributes[name] ?? null;
+  }
   querySelector() {
     return new FakeElement();
   }
@@ -168,10 +177,20 @@ defaultApp.click("[data-open-moves]");
 const syncApp = runApp(null, { crypto: true });
 syncApp.click("#create-sync-code");
 await new Promise((resolve) => setTimeout(resolve, 100));
+const badgeApp = runApp();
+badgeApp.elementFor("[data-badge]").dataset.badge = "zephyr";
+badgeApp.click("[data-badge]");
 
 const checks = {
-  speciesStat: defaultApp.elementFor("#stat-species").textContent,
-  locationStat: defaultApp.elementFor("#stat-locations").textContent,
+  dashboardRendered:
+    defaultApp.elementFor("#dashboard").innerHTML.includes("Dex Catch Progress") &&
+    defaultApp.elementFor("#dashboard").innerHTML.includes("Badge Progress") &&
+    defaultApp.elementFor("#dashboard").innerHTML.includes("progress-track") &&
+    defaultApp.elementFor("#dashboard").innerHTML.includes('data-badge="zephyr"') &&
+    defaultApp.elementFor("#dashboard").innerHTML.includes("assets/art/badges/zephyr.png"),
+  badgeToggleRendered:
+    badgeApp.elementFor("#dashboard").innerHTML.includes("1 / 16") &&
+    badgeApp.elementFor("#dashboard").innerHTML.includes("is-obtained"),
   dexCardsRendered: defaultApp.elementFor("#dex-grid").innerHTML.includes("Bulbasaur"),
   dexInitialCardCount: (defaultApp.elementFor("#dex-grid").innerHTML.match(/data-species-card=/g) || []).length,
   dexSortControlRendered: defaultApp.elementFor("#dex-controls").innerHTML.includes("id=\"dex-sort\"") && defaultApp.elementFor("#dex-controls").innerHTML.includes("Sp. Atk"),
@@ -184,6 +203,9 @@ const checks = {
     defaultApp.elementFor("#location-list").innerHTML.includes("data-open-species") &&
     defaultApp.elementFor("#location-list").innerHTML.includes("encounter-link") &&
     defaultApp.elementFor("#location-list").innerHTML.includes("mini-sprite"),
+  locationsGroupedByTime:
+    defaultApp.elementFor("#location-list").innerHTML.includes("location-time-section") &&
+    defaultApp.elementFor("#location-list").innerHTML.includes("location-method"),
   speciesModalRendered:
     speciesModalApp.elementFor("#modal-root").innerHTML.includes("data-species-modal=\"Bulbasaur\"") &&
     speciesModalApp.elementFor("#modal-root").innerHTML.includes("Mark caught") &&
@@ -199,12 +221,25 @@ const checks = {
     defaultApp.elementFor("#modal-root").innerHTML.includes("Strikes the foe with slender, whiplike vines."),
   movesTabHasTutorSection:
     defaultApp.elementFor("#move-table").innerHTML.includes("Tutor moves") &&
+    defaultApp.elementFor("#move-table").innerHTML.includes("Description") &&
+    defaultApp.elementFor("#move-table").innerHTML.includes("Draws the foe close, then strikes without fail.") &&
     defaultApp.elementFor("#move-table").innerHTML.includes("Requirement") &&
     defaultApp.elementFor("#move-table").innerHTML.includes("data-move-sections=\"expand\"") &&
-    defaultApp.elementFor("#move-table").innerHTML.includes("section-count"),
+    defaultApp.elementFor("#move-table").innerHTML.includes("section-count") &&
+    !defaultApp.elementFor("#move-table").innerHTML.includes("Protect Affected"),
   movesTabTutorRowsPlain: !defaultApp.elementFor("#move-table").innerHTML.includes("data-jump-move"),
   trainerPlanButtonsRendered: defaultApp.elementFor("#trainer-list").innerHTML.includes("Plan this trainer"),
+  bossBattleLabelsRendered:
+    indexHtml.includes(">Boss Battles</span>") &&
+    defaultApp.elementFor("#trainer-controls").innerHTML.includes("Johto Gym Leaders") &&
+    defaultApp.elementFor("#trainer-controls").innerHTML.includes("Johto League") &&
+    !defaultApp.elementFor("#trainer-controls").innerHTML.includes("JOHTO GYM LEADERS"),
   trainerSpritesRendered: defaultApp.elementFor("#trainer-list").innerHTML.includes("trainer-avatar") && defaultApp.elementFor("#trainer-list").innerHTML.includes("mini-sprite"),
+  trainerMoveTooltipsRendered:
+    defaultApp.elementFor("#trainer-list").innerHTML.includes("move-tooltip") &&
+    defaultApp.elementFor("#trainer-list").innerHTML.includes("Power") &&
+    defaultApp.elementFor("#trainer-list").innerHTML.includes("trainer-held-item") &&
+    styleSheet.includes(".trainer-move-list"),
   teamSlotsRendered: (defaultApp.elementFor("#team-grid").innerHTML.match(/Slot /g) || []).length,
   teamBuilderEnhanced:
     defaultApp.elementFor("#team-grid").innerHTML.includes("data-team-species-suggestions") &&
@@ -229,6 +264,33 @@ const checks = {
     !bossApp.elementFor("#team-grid").innerHTML.includes("Protect Affected") &&
     !bossApp.elementFor("#team-grid").innerHTML.includes(">Ability</option>"),
   teamOverviewRendered: defaultApp.elementFor("#team-overview").innerHTML.includes("team-overview-slot"),
+  plannerEnhanced:
+    defaultApp.elementFor("#planner-grid").innerHTML.includes("Endgame Team Progress") &&
+    defaultApp.elementFor("#planner-grid").innerHTML.includes("data-planner-species-suggestions") &&
+    defaultApp.elementFor("#planner-grid").innerHTML.includes("aria-autocomplete=\"list\"") &&
+    defaultApp.elementFor("#planner-grid").innerHTML.includes("data-planner-move") &&
+    defaultApp.elementFor("#planner-grid").innerHTML.includes("data-planner-item"),
+  typeBackgroundsRendered:
+    defaultApp.elementFor("#dex-grid").innerHTML.includes("assets/type-backgrounds/grass.jpg") &&
+    defaultApp.elementFor("#location-list").innerHTML.includes("type-backed") &&
+    bossApp.elementFor("#team-overview").innerHTML.includes("assets/type-backgrounds/grass.jpg") &&
+    bossApp.elementFor("#team-grid").innerHTML.includes("assets/type-backgrounds/grass.jpg"),
+  headerBannerRendered:
+    styleSheet.includes("assets/art/heart-soul-banner.png") &&
+    styleSheet.includes(".theme-toggle") &&
+    indexHtml.includes("assets/nav/rule_book.png") &&
+    indexHtml.includes("assets/nav/bag.png") &&
+    indexHtml.includes("assets/nav/card_key.png") &&
+    indexHtml.includes(">Field Guide</span>") &&
+    defaultApp.elementFor("#theme-toggle").dataset.themeState === "light" &&
+    defaultApp.elementFor("#theme-toggle").getAttribute("aria-label") === "Switch to dark mode",
+  customFontRendered:
+    styleSheet.includes("@font-face") &&
+    styleSheet.includes("assets/fonts/atlantis-international.ttf") &&
+    styleSheet.includes(".item-data-table td") &&
+    styleSheet.includes(".move-data-table td") &&
+    styleSheet.includes("--font-display") &&
+    styleSheet.includes("--font-readable"),
   teamRulesRemoved: !defaultApp.elementFor("#rules-panel").innerHTML.includes("Fairy type") && !defaultApp.elementFor("#rules-panel").innerHTML.includes("physical/special split"),
   customBattlePlannerRendered: defaultApp.elementFor("#battle-targets").innerHTML.includes("Custom targets"),
   bossBattlePlannerRendered: bossApp.elementFor("#battle-targets").innerHTML.includes("Boss battle") && bossApp.elementFor("#battle-targets").innerHTML.includes(firstTrainer.name),
@@ -247,8 +309,8 @@ const checks = {
 console.log(JSON.stringify(checks, null, 2));
 
 if (
-  String(checks.speciesStat) !== "423" ||
-  String(checks.locationStat) !== "144" ||
+  !checks.dashboardRendered ||
+  !checks.badgeToggleRendered ||
   !checks.dexCardsRendered ||
   checks.dexInitialCardCount !== 50 ||
   !checks.dexSortControlRendered ||
@@ -258,6 +320,7 @@ if (
   !checks.dexCardsDoNotUseProfileBlocks ||
   !checks.dexCardsHideNoneAbilities ||
   !checks.locationsHaveClickableSpriteEncounters ||
+  !checks.locationsGroupedByTime ||
   !checks.speciesModalRendered ||
   !checks.itemIconsRendered ||
   !checks.itemDescriptionsRendered ||
@@ -265,11 +328,17 @@ if (
   !checks.movesTabHasTutorSection ||
   !checks.movesTabTutorRowsPlain ||
   !checks.trainerPlanButtonsRendered ||
+  !checks.bossBattleLabelsRendered ||
   !checks.trainerSpritesRendered ||
+  !checks.trainerMoveTooltipsRendered ||
   checks.teamSlotsRendered !== 6 ||
   !checks.teamBuilderEnhanced ||
   !checks.teamBuilderDetails ||
   !checks.teamOverviewRendered ||
+  !checks.plannerEnhanced ||
+  !checks.typeBackgroundsRendered ||
+  !checks.headerBannerRendered ||
+  !checks.customFontRendered ||
   !checks.teamRulesRemoved ||
   !checks.customBattlePlannerRendered ||
   !checks.bossBattlePlannerRendered ||

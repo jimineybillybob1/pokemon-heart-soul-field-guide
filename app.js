@@ -15,7 +15,7 @@
   const syncDeviceKey = "heart-soul-field-guide-sync-device-v1";
   const syncEndpoint = (window.HEART_SOUL_SYNC_ENDPOINT || "").replace(/\/+$/, "");
   const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  const appShellVersion = "heart-soul-field-guide-v7";
+  const appShellVersion = "heart-soul-field-guide-v16";
   const species = [...data.species].sort((a, b) => Number(a.dex || 0) - Number(b.dex || 0));
   const speciesByName = new Map(species.map((entry) => [entry.name, entry]));
   const speciesByLookup = new Map(species.map((entry) => [normalize(entry.name), entry]));
@@ -30,7 +30,61 @@
   });
   const tutorsByMove = new Map(data.tutors.map((tutor) => [tutor.move, tutor]));
   const trainersById = new Map(data.trainers.map((trainer) => [trainer.id, trainer]));
-  const trainerCategories = unique(data.trainers.map((trainer) => trainer.category)).sort((a, b) => a.localeCompare(b));
+  const bossCategoryOrder = [
+    "Johto Gym Leaders",
+    "Johto League",
+    "Johto Gym Leader Rematches",
+    "Kanto Gym Leaders",
+    "Kanto League",
+    "Rockets",
+    "Rival",
+    "Red",
+    "Misc",
+  ];
+  const bossCategoryLookup = new Map(
+    bossCategoryOrder.map((label) => [normalize(label), label]).concat([
+      ["johto gym leaders", "Johto Gym Leaders"],
+      ["johto league", "Johto League"],
+      ["johto gym leader rematches", "Johto Gym Leader Rematches"],
+      ["kanto gym leaders", "Kanto Gym Leaders"],
+      ["kanto league", "Kanto League"],
+      ["rockets", "Rockets"],
+      ["rival", "Rival"],
+      ["red", "Red"],
+      ["misc", "Misc"],
+    ]),
+  );
+  const trainerCategories = bossCategoryOrder.filter((category) => data.trainers.some((trainer) => trainerCategoryLabel(trainer) === category));
+  const badgeGroups = [
+    {
+      region: "Johto",
+      badges: [
+        { id: "zephyr", name: "Zephyr Badge", leader: "Falkner" },
+        { id: "hive", name: "Hive Badge", leader: "Bugsy" },
+        { id: "plain", name: "Plain Badge", leader: "Whitney" },
+        { id: "fog", name: "Fog Badge", leader: "Morty" },
+        { id: "storm", name: "Storm Badge", leader: "Chuck" },
+        { id: "mineral", name: "Mineral Badge", leader: "Jasmine" },
+        { id: "glacier", name: "Glacier Badge", leader: "Pryce" },
+        { id: "rising", name: "Rising Badge", leader: "Clair" },
+      ],
+    },
+    {
+      region: "Kanto",
+      badges: [
+        { id: "boulder", name: "Boulder Badge", leader: "Brock" },
+        { id: "cascade", name: "Cascade Badge", leader: "Misty" },
+        { id: "thunder", name: "Thunder Badge", leader: "Lt. Surge" },
+        { id: "rainbow", name: "Rainbow Badge", leader: "Erika" },
+        { id: "soul", name: "Soul Badge", leader: "Janine" },
+        { id: "marsh", name: "Marsh Badge", leader: "Sabrina" },
+        { id: "volcano", name: "Volcano Badge", leader: "Blaine" },
+        { id: "earth", name: "Earth Badge", leader: "Blue" },
+      ],
+    },
+  ];
+  const badgeDefinitions = badgeGroups.flatMap((group) => group.badges);
+  const badgeIds = new Set(badgeDefinitions.map((badge) => badge.id));
   const typeNames = [
     "Normal",
     "Fire",
@@ -71,6 +125,26 @@
     Steel: "#6f8793",
     Fairy: "#d45fa8",
     Mystery: "#6a7a8a",
+  };
+  const typeBackgrounds = {
+    Grass: "assets/type-backgrounds/grass.jpg",
+    Fire: "assets/type-backgrounds/fire.jpg",
+    Water: "assets/type-backgrounds/water.jpg",
+    Electric: "assets/type-backgrounds/electric.jpg",
+    Ice: "assets/type-backgrounds/ice.jpg",
+    Fighting: "assets/type-backgrounds/fighting.jpg",
+    Poison: "assets/type-backgrounds/poison.jpg",
+    Ground: "assets/type-backgrounds/ground.jpg",
+    Flying: "assets/type-backgrounds/flying.jpg",
+    Psychic: "assets/type-backgrounds/psychic.jpg",
+    Bug: "assets/type-backgrounds/bug.jpg",
+    Rock: "assets/type-backgrounds/rock.jpg",
+    Ghost: "assets/type-backgrounds/ghost.jpg",
+    Dragon: "assets/type-backgrounds/dragon.jpg",
+    Steel: "assets/type-backgrounds/steel.jpg",
+    Dark: "assets/type-backgrounds/dark.jpg",
+    Fairy: "assets/type-backgrounds/fairy.jpg",
+    Normal: "assets/type-backgrounds/normal.jpg",
   };
   const abilityDetails = {
     "stench": "Helps repel wild Pokemon.",
@@ -223,13 +297,7 @@
   const els = {
     tabs: [...document.querySelectorAll("[data-view]")],
     views: [...document.querySelectorAll(".view")],
-    stats: {
-      species: document.querySelector("#stat-species"),
-      locations: document.querySelector("#stat-locations"),
-      items: document.querySelector("#stat-items"),
-      trainers: document.querySelector("#stat-trainers"),
-      caught: document.querySelector("#stat-caught"),
-    },
+    dashboard: document.querySelector("#dashboard"),
     teamOverview: document.querySelector("#team-overview"),
     dexControls: document.querySelector("#dex-controls"),
     dexGrid: document.querySelector("#dex-grid"),
@@ -263,6 +331,7 @@
 
   function init() {
     document.documentElement.dataset.theme = state.theme;
+    renderThemeToggle();
     updateCounts();
     renderControls();
     renderDex();
@@ -300,7 +369,25 @@
         return;
       }
 
+      const plannerSpeciesOption = event.target.closest("[data-planner-species-option]");
+      if (plannerSpeciesOption) {
+        event.preventDefault();
+        selectPlannerSpecies(Number(plannerSpeciesOption.dataset.plannerSlot), plannerSpeciesOption.dataset.plannerSpeciesOption);
+        return;
+      }
+
       if (!event.target.closest(".species-search-field")) hideTeamSpeciesSuggestions();
+
+      const badgeButton = event.target.closest("[data-badge]");
+      if (badgeButton) {
+        const badgeId = badgeButton.dataset.badge;
+        if (!badgeIds.has(badgeId)) return;
+        state.badges[badgeId] = !state.badges[badgeId];
+        persist();
+        renderDashboard();
+        renderSave();
+        return;
+      }
 
       const caughtButton = event.target.closest("[data-caught]");
       if (caughtButton) {
@@ -308,7 +395,7 @@
         const modalSpecies = caughtButton.closest("[data-species-modal]")?.dataset.speciesModal;
         state.caught[name] = !state.caught[name];
         persist();
-        updateCounts();
+        renderDashboard();
         renderDex();
         renderLocations();
         renderSave();
@@ -398,6 +485,12 @@
       const evolveTeam = event.target.closest("[data-evolve-team]");
       if (evolveTeam) {
         evolveTeamSlot(Number(evolveTeam.dataset.evolveTeam), evolveTeam.dataset.evolveTo);
+        return;
+      }
+
+      const evolvePlanner = event.target.closest("[data-evolve-planner]");
+      if (evolvePlanner) {
+        evolvePlannerSlot(Number(evolvePlanner.dataset.evolvePlanner), evolvePlanner.dataset.evolveTo);
         return;
       }
 
@@ -497,11 +590,12 @@
     document.addEventListener("change", handleChange);
     document.addEventListener("focusin", handleFocusIn);
     document.addEventListener("keydown", (event) => {
-      if (event.target.matches("[data-team-species]") && event.key === "Enter") {
+      if ((event.target.matches("[data-team-species]") || event.target.matches("[data-planner-species]")) && event.key === "Enter") {
         const match = teamSpeciesMatches(event.target.value)[0];
         if (match) {
           event.preventDefault();
-          selectTeamSpecies(Number(event.target.dataset.teamSpecies), match.name);
+          if (event.target.matches("[data-team-species]")) selectTeamSpecies(Number(event.target.dataset.teamSpecies), match.name);
+          else selectPlannerSpecies(Number(event.target.dataset.plannerSpecies), match.name);
         }
         return;
       }
@@ -514,8 +608,17 @@
     els.themeToggle.addEventListener("click", () => {
       state.theme = state.theme === "dark" ? "light" : "dark";
       document.documentElement.dataset.theme = state.theme;
+      renderThemeToggle();
       persist();
     });
+  }
+
+  function renderThemeToggle() {
+    if (!els.themeToggle) return;
+    const isDark = state.theme === "dark";
+    els.themeToggle.dataset.themeState = state.theme;
+    els.themeToggle.setAttribute("aria-pressed", String(isDark));
+    els.themeToggle.setAttribute("aria-label", `Switch to ${isDark ? "light" : "dark"} mode`);
   }
 
   function handleInput(event) {
@@ -538,11 +641,18 @@
       renderTrainers();
     } else if (target.matches("[data-team-species]")) {
       updateTeamSpeciesSuggestions(target);
+    } else if (target.matches("[data-planner-species]")) {
+      updatePlannerSpeciesSuggestions(target);
     } else if (target.matches("[data-team-nickname]")) {
       const index = Number(target.dataset.teamNickname);
       state.team[index].nickname = cleanTeamNickname(target.value);
       persist();
       renderTeamOverview();
+      renderSave();
+    } else if (target.matches("[data-planner-nickname]")) {
+      const index = Number(target.dataset.plannerNickname);
+      state.planner[index].nickname = cleanTeamNickname(target.value);
+      persist();
       renderSave();
     } else if (target.matches("[data-planner-note]")) {
       const index = Number(target.dataset.plannerNote);
@@ -614,8 +724,19 @@
       state.team[index].moves[moveIndex] = target.value;
       persistAndRenderTeam();
     } else if (target.matches("[data-planner-species]")) {
-      const index = Number(target.dataset.plannerSpecies);
-      state.planner[index].species = target.value;
+      selectPlannerSpecies(Number(target.dataset.plannerSpecies), target.value, { allowClear: true });
+    } else if (target.matches("[data-planner-ability]")) {
+      state.planner[Number(target.dataset.plannerAbility)].ability = target.value;
+      persistAndRenderPlanner();
+    } else if (target.matches("[data-planner-nature]")) {
+      state.planner[Number(target.dataset.plannerNature)].nature = naturesByName.has(target.value) ? target.value : "";
+      persistAndRenderPlanner();
+    } else if (target.matches("[data-planner-item]")) {
+      updatePlannerItem(Number(target.dataset.plannerItem), target.value, target);
+    } else if (target.matches("[data-planner-move]")) {
+      const index = Number(target.dataset.plannerSlot);
+      const moveIndex = Number(target.dataset.plannerMove);
+      state.planner[index].moves[moveIndex] = target.value;
       persistAndRenderPlanner();
     } else if (target.matches("[data-battle-mode]")) {
       state.battleMode = target.value === "trainer" ? "trainer" : "custom";
@@ -632,7 +753,7 @@
     } else if (target.matches("#battle-trainer-id")) {
       state.battleTrainerId = target.value;
       const trainer = trainersById.get(target.value);
-      state.battleTrainerCategory = trainer?.category || state.battleTrainerCategory;
+      state.battleTrainerCategory = trainer ? trainerCategoryLabel(trainer) : state.battleTrainerCategory;
       persist();
       renderBattlePlanner();
       renderSave();
@@ -650,6 +771,7 @@
   function handleFocusIn(event) {
     const target = event.target;
     if (target.matches("[data-team-species]")) updateTeamSpeciesSuggestions(target);
+    if (target.matches("[data-planner-species]")) updatePlannerSpeciesSuggestions(target);
   }
 
   function renderControls() {
@@ -687,7 +809,7 @@
       <label class="field"><span>Type</span><select id="item-type">${option("", "Any type")}${itemTypes.map((type) => option(type, type)).join("")}</select></label>
     `;
     els.moveControls.innerHTML = `
-      <label class="field grow"><span>Search</span><input id="move-search" type="search" placeholder="Move, effect, flag" value="${attr(filters.moveSearch)}" /></label>
+      <label class="field grow"><span>Search</span><input id="move-search" type="search" placeholder="Move, description, type" value="${attr(filters.moveSearch)}" /></label>
       <label class="field"><span>Type</span><select id="move-type">${typeOptions}</select></label>
       <label class="field"><span>Category</span><select id="move-category">
         ${option("", "Any category")}
@@ -697,7 +819,7 @@
       </select></label>
     `;
     els.trainerControls.innerHTML = `
-      <label class="field grow"><span>Search</span><input id="trainer-search" type="search" placeholder="Trainer, category, Pokemon, move" value="${attr(filters.trainerSearch)}" /></label>
+      <label class="field grow"><span>Search</span><input id="trainer-search" type="search" placeholder="Boss, group, Pokemon, move" value="${attr(filters.trainerSearch)}" /></label>
       <label class="field"><span>Category</span><select id="trainer-category">${option("", "Any category")}${trainerCategoryOptions.map((category) => option(category, category)).join("")}</select></label>
     `;
   }
@@ -757,7 +879,7 @@
     const availability = renderAvailability(entry);
     const abilities = displayAbilities(entry);
     return `
-      <article class="card pokemon-card" data-species-card="${attr(entry.name)}">
+      <article class="card pokemon-card type-backed" data-species-card="${attr(entry.name)}"${typeBackdropStyle(entry)}>
         <div class="pokemon-head">
           ${sprite(entry)}
           <div class="pokemon-title">
@@ -928,7 +1050,7 @@
     const abilities = displayAbilities(entry);
     els.modalRoot.innerHTML = `
       <div class="modal-backdrop" data-close-modal></div>
-      <section class="modal-panel species-modal" role="dialog" aria-modal="true" aria-labelledby="species-modal-title" data-species-modal="${attr(entry.name)}">
+      <section class="modal-panel species-modal type-backed" role="dialog" aria-modal="true" aria-labelledby="species-modal-title" data-species-modal="${attr(entry.name)}"${typeBackdropStyle(entry)}>
         <header class="modal-head species-modal-head">
           <div class="species-modal-title">
             ${sprite(entry)}
@@ -1004,7 +1126,7 @@
         </div>
         <div class="table-wrap modal-table">
           <table class="data-table move-modal-table">
-            <thead><tr><th>Move</th><th>Source</th><th>Type</th><th>Cat.</th><th>Power</th><th>Acc.</th><th>Effect</th></tr></thead>
+            <thead><tr><th>Move</th><th>Source</th><th>Type</th><th>Cat.</th><th>Power</th><th>Acc.</th><th>Description</th></tr></thead>
             <tbody>
               ${rows.map(renderMoveModalRow).join("")}
             </tbody>
@@ -1101,33 +1223,61 @@
   }
 
   function renderLocationCard(location) {
+    const groups = groupLocationRows(location.rows);
     return `
       <article class="location-card" data-location-card="${attr(location.name)}">
         <header>
           <h3>${text(location.name)}</h3>
           <span class="chip">${value(location.speciesCount)} species</span>
         </header>
-        <div class="table-wrap">
-          <table class="encounter-table">
-            <thead><tr><th>Time</th><th>Method</th><th>Encounters</th></tr></thead>
-            <tbody>
-              ${location.rows
-                .flatMap((row) =>
-                  Object.entries(row.methods).map(
-                    ([method, encounters]) => `
-                      <tr>
-                        <td>${text(row.time)}</td>
-                        <td>${text(method)}</td>
-                        <td><div class="encounter-list">${encounters.map(renderEncounterButton).join("")}</div></td>
-                      </tr>
-                    `,
-                  ),
-                )
-                .join("")}
-            </tbody>
-          </table>
+        <div class="location-time-sections">
+          ${groups.map(renderLocationTimeSection).join("")}
         </div>
       </article>
+    `;
+  }
+
+  function groupLocationRows(rows) {
+    const groups = new Map();
+    rows.forEach((row) => {
+      const label = row.time || "Any time";
+      if (!groups.has(label)) groups.set(label, []);
+      groups.get(label).push(row);
+    });
+    return [...groups.entries()]
+      .map(([time, timeRows]) => ({ time, rows: timeRows }))
+      .sort((a, b) => locationTimeRank(a.time) - locationTimeRank(b.time) || a.time.localeCompare(b.time));
+  }
+
+  function locationTimeRank(time) {
+    const value = normalize(time);
+    if (value.includes("day")) return 1;
+    if (value.includes("night")) return 2;
+    if (value.includes("morning")) return 0;
+    return 3;
+  }
+
+  function renderLocationTimeSection(group) {
+    const encounterCount = group.rows.reduce(
+      (total, row) => total + Object.values(row.methods).reduce((sum, encounters) => sum + encounters.length, 0),
+      0,
+    );
+    return `
+      <details class="location-time-section" open>
+        <summary><span>${text(group.time)}</span><span class="section-count">${value(encounterCount)}</span></summary>
+        <div class="location-method-list">
+          ${group.rows.flatMap((row) => Object.entries(row.methods).map(([method, encounters]) => renderLocationMethod(method, encounters))).join("")}
+        </div>
+      </details>
+    `;
+  }
+
+  function renderLocationMethod(method, encounters) {
+    return `
+      <section class="location-method">
+        <h4>${text(method)}</h4>
+        <div class="encounter-list">${encounters.map(renderEncounterButton).join("")}</div>
+      </section>
     `;
   }
 
@@ -1135,7 +1285,7 @@
     const entry = speciesByName.get(encounter.species);
     const caught = Boolean(state.caught[encounter.species]);
     return `
-      <button class="encounter-link ${caught ? "is-caught" : ""}" type="button" data-open-species="${attr(encounter.species)}">
+      <button class="encounter-link type-backed ${caught ? "is-caught" : ""}" type="button" data-open-species="${attr(encounter.species)}"${typeBackdropStyle(entry)}>
         ${miniSprite(entry)}
         <span>
           <strong>${text(encounter.species)}</strong>
@@ -1163,7 +1313,7 @@
     });
     els.itemCount.textContent = `Showing ${filtered.length} of ${data.items.length}`;
     els.itemTable.innerHTML = `
-      <table class="data-table">
+      <table class="data-table item-data-table">
         <thead><tr><th>Item</th><th>Description</th><th>Type</th><th>Move</th><th>Locations</th><th>Held by</th></tr></thead>
         <tbody>
           ${filtered
@@ -1206,7 +1356,7 @@
     const tutorMoveNames = new Set(data.tutors.map((tutor) => tutor.move));
     const filteredMoves = data.moves.filter((move) => {
       const displayCategory = effectiveCategory(move);
-      const haystack = normalize([move.name, move.description, move.effect, move.flags, displayCategory, move.type].join(" "));
+      const haystack = normalize([move.name, move.description, displayCategory, move.type].join(" "));
       return (
         (!query || haystack.includes(query)) &&
         (!filters.moveType || move.type === filters.moveType) &&
@@ -1217,7 +1367,7 @@
     const filteredTutors = data.tutors.filter((tutor) => {
       const move = moveByName.get(tutor.move);
       const displayCategory = effectiveCategory(move);
-      const haystack = normalize([tutor.move, tutor.location, tutor.cost, move?.description, move?.effect, move?.flags, displayCategory, move?.type].join(" "));
+      const haystack = normalize([tutor.move, tutor.location, tutor.cost, move?.description, displayCategory, move?.type].join(" "));
       return (
         (!query || haystack.includes(query)) &&
         (!filters.moveType || move?.type === filters.moveType) &&
@@ -1245,8 +1395,8 @@
     if (!rows.length) return empty("No moves match those filters.");
     return `
       <div class="table-wrap">
-        <table class="data-table">
-          <thead><tr><th>Move</th><th>Type</th><th>Cat.</th><th>Power</th><th>Acc.</th><th>PP</th><th>Effect</th></tr></thead>
+        <table class="data-table move-data-table">
+          <thead><tr><th>Move</th><th>Type</th><th>Cat.</th><th>Power</th><th>Acc.</th><th>PP</th><th>Description</th></tr></thead>
           <tbody>${rows.map(renderMoveTableRow).join("")}</tbody>
         </table>
       </div>
@@ -1257,8 +1407,8 @@
     if (!rows.length) return empty("No tutor moves match those filters.");
     return `
       <div class="table-wrap">
-        <table class="data-table">
-          <thead><tr><th>Move</th><th>Type</th><th>Cat.</th><th>Power</th><th>Acc.</th><th>Location</th><th>Requirement</th><th>Effect</th></tr></thead>
+        <table class="data-table move-data-table">
+          <thead><tr><th>Move</th><th>Type</th><th>Cat.</th><th>Power</th><th>Acc.</th><th>Location</th><th>Requirement</th><th>Description</th></tr></thead>
           <tbody>
             ${rows
               .map((tutor) => {
@@ -1299,7 +1449,7 @@
 
   function moveDescription(move) {
     if (!move) return "No move details listed.";
-    return move.description || joinParts([move.effect, move.flags]) || "No additional effect listed.";
+    return move.description || "No move description listed.";
   }
 
   function setMoveSectionsOpen(open) {
@@ -1311,12 +1461,14 @@
   function renderTrainers() {
     const query = normalize(filters.trainerSearch);
     const filtered = data.trainers.filter((trainer) => {
+      const category = trainerCategoryLabel(trainer);
       const haystack = normalize([
         trainer.category,
+        category,
         trainer.name,
         ...trainer.team.flatMap((mon) => [mon.species, mon.item, ...mon.moves]),
       ].join(" "));
-      return (!query || haystack.includes(query)) && (!filters.trainerCategory || trainer.category === filters.trainerCategory);
+      return (!query || haystack.includes(query)) && (!filters.trainerCategory || category === filters.trainerCategory);
     });
     els.trainerCount.textContent = `Showing ${filtered.length} of ${data.trainers.length}`;
     els.trainerList.innerHTML = filtered.map(renderTrainerCard).join("") || empty("No trainers match that search.");
@@ -1329,7 +1481,7 @@
           <div class="trainer-heading">
             ${trainerSprite(trainer)}
             <div>
-              <small class="muted">${text(trainer.category)}</small>
+              <small class="muted">${text(trainerCategoryLabel(trainer))}</small>
               <h3 title="${attr(trainer.name)}">${text(trainer.name)}</h3>
             </div>
           </div>
@@ -1350,15 +1502,30 @@
   function renderTrainerMon(mon) {
     const entry = speciesByName.get(mon.species);
     return `
-      <div class="trainer-mon">
+      <div class="trainer-mon type-backed"${typeBackdropStyle(entry)}>
         ${miniSprite(entry)}
-        <div>
+        <div class="trainer-mon-body">
           <strong title="${attr(mon.species)}">${text(mon.species)}${mon.level ? ` Lv ${value(mon.level)}` : ""}</strong>
           ${entry ? `<div class="type-row">${entry.types.map(typePill).join("")}</div>` : ""}
-          ${mon.item ? `<small>Item: ${text(mon.item)}</small>` : ""}
-          ${mon.moves.length ? `<div class="mini-list">${mon.moves.map((move) => `<span class="chip">${text(move)}</span>`).join("")}</div>` : ""}
+          ${mon.item ? `<small class="trainer-held-item">Item: ${text(mon.item)}</small>` : ""}
+          ${mon.moves.length ? `<div class="mini-list trainer-move-list">${mon.moves.map(renderTrainerMoveChip).join("")}</div>` : ""}
         </div>
       </div>
+    `;
+  }
+
+  function renderTrainerMoveChip(moveName) {
+    const move = moveByName.get(moveName);
+    return `
+      <span class="chip move-chip" tabindex="0">
+        ${text(moveName)}
+        <span class="move-tooltip">
+          <strong>${text(moveName)}</strong>
+          ${move ? `<span>${typePill(move.type)} <em>${text(effectiveCategory(move))}</em></span>` : ""}
+          ${move ? `<span>Power ${value(move.power)} / Acc ${value(move.accuracy)}</span>` : ""}
+          <small>${text(moveDescription(move))}</small>
+        </span>
+      </span>
     `;
   }
 
@@ -1423,7 +1590,7 @@
     const item = itemsByName.get(slot.item);
     const abilityOptions = teamAbilityOptions(entry, slot.ability);
     return `
-      <article class="slot-card">
+      <article class="slot-card ${entry ? "type-backed" : ""}"${typeBackdropStyle(entry)}>
         <header>
           <h3>Slot ${index + 1}</h3>
           <button class="small-button" type="button" data-clear-team="${index}">Clear</button>
@@ -1498,7 +1665,7 @@
         const entry = speciesByName.get(slot.species);
         const label = cleanTeamNickname(slot.nickname) || entry?.name || `Slot ${index + 1}`;
         return `
-          <button class="team-overview-slot ${entry ? "has-pokemon" : ""}" type="button" data-view-link="team">
+          <button class="team-overview-slot ${entry ? "has-pokemon type-backed" : ""}" type="button" data-view-link="team"${typeBackdropStyle(entry)}>
             <div class="team-overview-sprite">${entry ? sprite(entry) : `<span>${index + 1}</span>`}</div>
             <strong title="${attr(label)}">${text(label)}</strong>
             <small>${entry ? text(entry.name) : "Empty"}</small>
@@ -1565,7 +1732,7 @@
   }
 
   function hideTeamSpeciesSuggestions() {
-    document.querySelectorAll("[data-team-species-suggestions]").forEach((panel) => {
+    document.querySelectorAll("[data-team-species-suggestions], [data-planner-species-suggestions]").forEach((panel) => {
       panel.hidden = true;
       panel.innerHTML = "";
     });
@@ -1594,7 +1761,7 @@
     return matches
       .map(
         (entry) => `
-          <button class="species-suggestion" type="button" data-team-slot="${index}" data-team-species-option="${attr(entry.name)}">
+          <button class="species-suggestion type-backed" type="button" data-team-slot="${index}" data-team-species-option="${attr(entry.name)}"${typeBackdropStyle(entry)}>
             ${miniSprite(entry)}
             <span>
               <strong>${text(entry.name)}</strong>
@@ -1604,6 +1771,82 @@
         `,
       )
       .join("");
+  }
+
+  function updatePlannerSpeciesSuggestions(target) {
+    const panel = target.closest(".species-search-field")?.querySelector("[data-planner-species-suggestions]");
+    if (!panel) return;
+    const index = Number(target.dataset.plannerSpecies);
+    const matches = teamSpeciesMatches(target.value);
+    panel.hidden = false;
+    panel.innerHTML = renderPlannerSpeciesSuggestions(matches, index, target.value);
+  }
+
+  function renderPlannerSpeciesSuggestions(matches, index, query) {
+    if (!matches.length) {
+      return `<div class="species-suggestion-empty">No Pokemon match ${text(query || "that search")}.</div>`;
+    }
+    return matches
+      .map(
+        (entry) => `
+          <button class="species-suggestion type-backed" type="button" data-planner-slot="${index}" data-planner-species-option="${attr(entry.name)}"${typeBackdropStyle(entry)}>
+            ${miniSprite(entry)}
+            <span>
+              <strong>${text(entry.name)}</strong>
+              <small>${text(entry.types.join(" / ") || "No type listed")}</small>
+            </span>
+          </button>
+        `,
+      )
+      .join("");
+  }
+
+  function selectPlannerSpecies(index, rawName, { allowClear = false } = {}) {
+    const name = String(rawName || "").trim();
+    const entry = speciesByName.get(name) || speciesByLookup.get(normalize(name));
+    if (!entry) {
+      if (allowClear && !name) {
+        const current = state.planner[index] || blankPlannerSlot();
+        state.planner[index] = { ...blankPlannerSlot(), nature: current.nature || "", item: current.item || "", nickname: current.nickname || "", note: current.note || "" };
+        persistAndRenderPlanner();
+      }
+      return;
+    }
+    const current = state.planner[index] || blankPlannerSlot();
+    state.planner[index] = {
+      species: entry.name,
+      ability: defaultAbility(entry),
+      moves: ["", "", "", ""],
+      nature: current.nature || "",
+      item: current.item || "",
+      nickname: current.nickname || "",
+      note: current.note || "",
+    };
+    persistAndRenderPlanner();
+  }
+
+  function updatePlannerItem(index, itemName, target) {
+    const item = itemsByName.get(itemName);
+    state.planner[index].item = item ? item.name : "";
+    if (!item && target) target.value = "";
+    persist();
+    const summary = target?.closest(".slot-card")?.querySelector("[data-planner-item-summary]");
+    if (summary) summary.outerHTML = renderPlannerItemSummary(item);
+    renderSave();
+  }
+
+  function renderPlannerItemSummary(item) {
+    if (!item) return '<div class="held-item-summary is-empty" data-planner-item-summary><span class="muted">No held item selected.</span></div>';
+    const details = itemDescription(item);
+    return `
+      <div class="held-item-summary" data-planner-item-summary>
+        ${itemIcon(item)}
+        <div>
+          <strong>${text(item.name)}</strong>
+          <small>${text(details || item.type)}</small>
+        </div>
+      </div>
+    `;
   }
 
   function updateTeamItem(index, itemName, target) {
@@ -1682,9 +1925,10 @@
       .join("");
   }
 
-  function renderEvolutionControls(entry, index) {
+  function renderEvolutionControls(entry, index, mode = "team") {
     const evolutions = (entry.evolutions || []).filter((evolution) => speciesByName.has(evolution.to));
     if (!evolutions.length) return "";
+    const dataName = mode === "planner" ? "data-evolve-planner" : "data-evolve-team";
     return `
       <section class="slot-evolution">
         <span>Evolution</span>
@@ -1693,7 +1937,7 @@
             .map((evolution) => {
               const target = speciesByName.get(evolution.to);
               return `
-                <button class="evolve-button" type="button" data-evolve-team="${index}" data-evolve-to="${attr(target.name)}">
+                <button class="evolve-button" type="button" ${dataName}="${index}" data-evolve-to="${attr(target.name)}">
                   ${miniSprite(target)}
                   <span><strong>Evolve to ${text(target.name)}</strong><small>${text(evolutionSummary(evolution))}</small></span>
                 </button>
@@ -1749,23 +1993,100 @@
     setSaveStatus(`${target.name} evolved and marked caught.`, "success");
   }
 
+  function evolvePlannerSlot(index, targetName) {
+    const slot = state.planner[index];
+    const target = speciesByName.get(targetName);
+    if (!slot || !target) return;
+    const availableMoves = new Set(compatibleMoves(target));
+    const availableAbilities = displayAbilities(target).map((ability) => ability.name);
+    slot.species = target.name;
+    slot.ability = availableAbilities.includes(slot.ability) ? slot.ability : defaultAbility(target);
+    slot.moves = slot.moves.map((move) => (availableMoves.has(move) ? move : ""));
+    persistAndRenderPlanner();
+    setSaveStatus(`${target.name} set as the planned evolution.`, "success");
+  }
+
   function renderPlanner() {
-    els.plannerGrid.innerHTML = state.planner.map((slot, index) => renderPlannerSlot(slot, index)).join("");
+    els.plannerGrid.innerHTML = `
+      <datalist id="planner-item-list">${data.items.map((item) => `<option value="${attr(item.name)}"></option>`).join("")}</datalist>
+      ${renderPlannerProgressSummary()}
+      ${state.planner.map((slot, index) => renderPlannerSlot(slot, index)).join("")}
+    `;
   }
 
   function renderPlannerSlot(slot, index) {
     const entry = speciesByName.get(slot.species);
+    const moveChoices = entry ? compatibleMoves(entry) : [];
+    const item = itemsByName.get(slot.item);
+    const abilityOptions = teamAbilityOptions(entry, slot.ability);
     return `
-      <article class="slot-card">
+      <article class="slot-card planner-slot-card ${entry ? "type-backed" : ""}"${typeBackdropStyle(entry)}>
         <header>
           <h3>Plan ${index + 1}</h3>
           <button class="small-button" type="button" data-clear-planner="${index}">Clear</button>
         </header>
-        ${entry ? `<div class="slot-preview">${sprite(entry)}<div><strong title="${attr(entry.name)}">${text(entry.name)}</strong><div class="type-row">${entry.types.map(typePill).join("")}</div></div></div>` : ""}
-        <label class="field"><span>Pokemon</span><select data-planner-species="${index}">${speciesSelect(slot.species)}</select></label>
-        ${entry ? renderAvailability(entry) : '<div class="availability-box muted">Pick a Pokemon to see locations.</div>'}
-        <label class="field"><span>Notes</span><textarea data-planner-note="${index}" placeholder="Role, nature, route timing, item plan">${text(slot.note || "")}</textarea></label>
+        ${
+          entry
+            ? `<div class="slot-preview">${sprite(entry)}<div><strong title="${attr(entry.name)}">${text(slot.nickname || entry.name)}</strong><span class="muted">${text(entry.name)}</span><div class="type-row">${entry.types.map(typePill).join("")}</div></div></div>`
+            : '<div class="slot-empty">Search for a Pokemon to plan this endgame slot.</div>'
+        }
+        <div class="slot-body">
+          <div class="team-field-grid">
+            <div class="field species-search-field">
+              <span>Pokemon</span>
+              <input data-planner-species="${index}" value="${attr(slot.species)}" placeholder="Search Pokemon" autocomplete="off" aria-autocomplete="list" aria-controls="planner-species-suggestions-${index}" />
+              <div class="species-suggestion-box" id="planner-species-suggestions-${index}" data-planner-species-suggestions="${index}" hidden></div>
+            </div>
+            <label class="field"><span>Nickname</span><input data-planner-nickname="${index}" value="${attr(slot.nickname || "")}" maxlength="32" placeholder="Optional nickname" /></label>
+            <label class="field"><span>Nature</span><select data-planner-nature="${index}">${natureOptions(slot.nature)}</select></label>
+            <label class="field"><span>Ability</span><select data-planner-ability="${index}" ${entry ? "" : "disabled"}>${abilityOptions}</select></label>
+            <label class="field team-item-field"><span>Held item</span><input data-planner-item="${index}" list="planner-item-list" value="${attr(slot.item || "")}" placeholder="Search held item" autocomplete="off" /></label>
+          </div>
+          ${renderPlannerItemSummary(item)}
+          ${entry ? renderTeamStats(entry, slot.nature) : ""}
+          ${entry ? renderAvailability(entry) : '<div class="availability-box muted">Pick a Pokemon to see locations.</div>'}
+          <div class="move-grid">
+            ${[0, 1, 2, 3]
+              .map(
+                (moveIndex) => `
+                  <div class="move-field">
+                    <label class="field"><span>Move ${moveIndex + 1}</span><select data-planner-slot="${index}" data-planner-move="${moveIndex}">
+                      ${moveSelect(moveChoices, slot.moves[moveIndex])}
+                    </select></label>
+                    ${renderTeamMoveSummary(slot.moves[moveIndex])}
+                  </div>
+                `,
+              )
+              .join("")}
+          </div>
+          ${entry ? renderEvolutionControls(entry, index, "planner") : ""}
+          <label class="field"><span>Notes</span><textarea data-planner-note="${index}" placeholder="Role, timing, item route, backup plan">${text(slot.note || "")}</textarea></label>
+        </div>
       </article>
+    `;
+  }
+
+  function renderPlannerProgressSummary() {
+    const planned = state.planner.filter((slot) => slot.species);
+    const caught = planned.filter((slot) => state.caught[slot.species]).length;
+    const moves = planned.reduce((total, slot) => total + slot.moves.filter(Boolean).length, 0);
+    const items = planned.filter((slot) => slot.item).length;
+    return `
+      <section class="team-offense-summary planner-progress-summary">
+        <header>
+          <div>
+            <h3>Endgame Team Progress</h3>
+            <p class="muted">${planned.length ? `${planned.length} of 6 target Pokemon planned` : "Plan the team you want by the end of the game."}</p>
+          </div>
+          <span class="chip">${planned.length} / 6 planned</span>
+        </header>
+        <div class="planner-progress-grid">
+          <span class="coverage-type ${planned.length === 6 ? "is-covered" : "is-missing"}" style="--type-color:${typeColors.Normal}"><strong>Species</strong><small>${planned.length} / 6</small></span>
+          <span class="coverage-type ${caught === planned.length && planned.length ? "is-covered" : "is-missing"}" style="--type-color:${typeColors.Grass}"><strong>Caught</strong><small>${caught} / ${planned.length || 6}</small></span>
+          <span class="coverage-type ${moves >= planned.length * 4 && planned.length ? "is-covered" : "is-missing"}" style="--type-color:${typeColors.Electric}"><strong>Moves</strong><small>${moves} / ${planned.length * 4 || 24}</small></span>
+          <span class="coverage-type ${items >= planned.length && planned.length ? "is-covered" : "is-missing"}" style="--type-color:${typeColors.Rock}"><strong>Held items</strong><small>${items} / ${planned.length || 6}</small></span>
+        </div>
+      </section>
     `;
   }
 
@@ -1805,7 +2126,7 @@
   }
 
   function renderTrainerBattleControls(trainer) {
-    const category = trainer?.category || state.battleTrainerCategory || trainerCategories[0] || "";
+    const category = trainer ? trainerCategoryLabel(trainer) : state.battleTrainerCategory || trainerCategories[0] || "";
     const trainerOptions = trainersForCategory(category);
     return `
       <div class="battle-controls">
@@ -1824,7 +2145,7 @@
       <section class="battle-side-section">
         <header>
           <div>
-            <small class="muted">${text(trainer.category)}</small>
+            <small class="muted">${text(trainerCategoryLabel(trainer))}</small>
             <h4>${text(trainer.name)}</h4>
           </div>
           <span class="chip">${trainer.team.length} targets</span>
@@ -1839,7 +2160,7 @@
   function renderTrainerTarget(mon) {
     const entry = speciesByName.get(mon.species) || { name: mon.species, types: [], sprite: "" };
     return `
-      <div class="trainer-target">
+      <div class="trainer-target type-backed"${typeBackdropStyle(entry)}>
         ${sprite(entry)}
         <div>
           <strong>${text(mon.species)}${mon.level ? ` Lv ${value(mon.level)}` : ""}</strong>
@@ -1941,7 +2262,7 @@
     const entry = target.species;
     const mon = target.mon || {};
     return `
-      <div class="target-summary">
+      <div class="target-summary type-backed"${typeBackdropStyle(entry)}>
         ${sprite(entry)}
         <div>
           <strong>${text(entry.name)}${mon.level ? ` Lv ${value(mon.level)}` : ""}</strong>
@@ -2097,6 +2418,7 @@
         <header><h3>Progress Summary</h3><span class="chip">Autosaved</span></header>
         <div class="chip-row">
           <span class="chip">${caughtCount()} caught</span>
+          <span class="chip">${obtainedBadgeCount()} badges</span>
           <span class="chip">${state.team.filter((slot) => slot.species).length} team slots</span>
           <span class="chip">${state.planner.filter((slot) => slot.species).length} planned</span>
           <span class="chip">${state.battleMode === "trainer" ? `Boss: ${text(selectedBattleTrainer()?.name || "trainer")}` : "Custom battle"}</span>
@@ -2205,11 +2527,69 @@
   }
 
   function updateCounts() {
-    els.stats.species.textContent = data.meta.counts.species;
-    els.stats.locations.textContent = data.meta.counts.locations;
-    els.stats.items.textContent = data.meta.counts.items;
-    els.stats.trainers.textContent = data.meta.counts.trainers;
-    els.stats.caught.textContent = caughtCount();
+    renderDashboard();
+  }
+
+  function renderDashboard() {
+    if (!els.dashboard) return;
+    const caught = caughtCount();
+    const total = species.length;
+    const percent = total ? Math.round((caught / total) * 100) : 0;
+    els.dashboard.innerHTML = `
+      <button class="overview-panel catch-progress-panel" type="button" data-view-link="dex">
+        <div class="overview-panel-head">
+          <div>
+            <span class="overview-kicker">Dex Catch Progress</span>
+            <strong>${value(caught)} / ${value(total)}</strong>
+          </div>
+          <span class="overview-percent">${value(percent)}%</span>
+        </div>
+        <span class="progress-track" aria-hidden="true"><span style="width: ${Math.min(100, Math.max(0, percent))}%"></span></span>
+        <p>${value(total - caught)} remaining</p>
+      </button>
+      <section class="overview-panel badge-progress-panel" aria-label="Badge tracker">
+        <div class="overview-panel-head">
+          <div>
+            <span class="overview-kicker">Badge Progress</span>
+            <strong>${value(obtainedBadgeCount())} / ${value(badgeDefinitions.length)}</strong>
+          </div>
+        </div>
+        <div class="badge-region-list">
+          ${badgeGroups.map(renderBadgeGroup).join("")}
+        </div>
+      </section>
+    `;
+  }
+
+  function renderBadgeGroup(group) {
+    return `
+      <div class="badge-region" data-region="${attr(group.region)}">
+        <span>${text(group.region)}</span>
+        <div class="badge-row">
+          ${group.badges.map(renderBadgeButton).join("")}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderBadgeButton(badge) {
+    const obtained = Boolean(state.badges?.[badge.id]);
+    return `
+      <button class="badge-button ${obtained ? "is-obtained" : ""}" type="button" data-badge="${attr(badge.id)}" aria-pressed="${obtained}" title="${attr(`${badge.name} - ${badge.leader}`)}">
+        <span class="badge-art">
+          <img src="${attr(badgeImagePath(badge))}" alt="" loading="lazy" onerror="this.hidden=true" />
+        </span>
+        <span class="sr-only">${text(badge.name)}</span>
+      </button>
+    `;
+  }
+
+  function badgeImagePath(badge) {
+    return `assets/art/badges/${badge.id}.png`;
+  }
+
+  function obtainedBadgeCount() {
+    return badgeDefinitions.filter((badge) => state.badges?.[badge.id]).length;
   }
 
   function addToTeam(name) {
@@ -2245,7 +2625,10 @@
       showView("planner");
       return;
     }
-    slot.species = name;
+    const entry = speciesByName.get(name);
+    slot.species = entry?.name || name;
+    slot.ability = entry ? defaultAbility(entry) : "";
+    slot.moves = ["", "", "", ""];
     persistAndRenderPlanner();
     showView("planner");
   }
@@ -2295,7 +2678,7 @@
     const trainer = trainersById.get(trainerId);
     if (!trainer) return;
     state.battleMode = "trainer";
-    state.battleTrainerCategory = trainer.category;
+    state.battleTrainerCategory = trainerCategoryLabel(trainer);
     state.battleTrainerId = trainer.id;
     persist();
     renderBattlePlanner();
@@ -2303,12 +2686,26 @@
     showView("battle");
   }
 
+  function trainerCategoryLabel(trainerOrCategory) {
+    const category = typeof trainerOrCategory === "string" ? trainerOrCategory : trainerOrCategory?.category || "";
+    const normalized = normalize(category);
+    return bossCategoryLookup.get(normalized) || titleCaseCategory(category);
+  }
+
+  function titleCaseCategory(category) {
+    return String(category || "")
+      .replace(/[_-]+/g, " ")
+      .trim()
+      .toLowerCase()
+      .replace(/\b\w/g, (letter) => letter.toUpperCase());
+  }
+
   function firstTrainerForCategory(category) {
-    return data.trainers.find((trainer) => trainer.category === category) || data.trainers[0] || null;
+    return data.trainers.find((trainer) => trainerCategoryLabel(trainer) === category) || data.trainers[0] || null;
   }
 
   function trainersForCategory(category) {
-    return data.trainers.filter((trainer) => trainer.category === category);
+    return data.trainers.filter((trainer) => trainerCategoryLabel(trainer) === category);
   }
 
   function selectedBattleTrainer() {
@@ -2320,7 +2717,7 @@
       state.battleTrainerCategory = trainerCategories[0] || "";
     }
     const current = selectedBattleTrainer();
-    if (!current || current.category !== state.battleTrainerCategory) {
+    if (!current || trainerCategoryLabel(current) !== state.battleTrainerCategory) {
       state.battleTrainerId = firstTrainerForCategory(state.battleTrainerCategory)?.id || "";
     }
     return selectedBattleTrainer();
@@ -2410,6 +2807,7 @@
 
   function rerenderStateful() {
     document.documentElement.dataset.theme = state.theme;
+    renderThemeToggle();
     updateCounts();
     renderRules();
     renderDex();
@@ -3035,10 +3433,11 @@
     const fresh = defaultState();
     if (!input || typeof input !== "object") return fresh;
     const battleMode = input.battleMode === "trainer" ? "trainer" : "custom";
-    let battleTrainerCategory = trainerCategories.includes(input.battleTrainerCategory) ? input.battleTrainerCategory : fresh.battleTrainerCategory;
+    const inputBattleCategory = trainerCategoryLabel(input.battleTrainerCategory);
+    let battleTrainerCategory = trainerCategories.includes(inputBattleCategory) ? inputBattleCategory : fresh.battleTrainerCategory;
     let battleTrainerId = typeof input.battleTrainerId === "string" && trainersById.has(input.battleTrainerId) ? input.battleTrainerId : "";
     const trainer = trainersById.get(battleTrainerId);
-    if (trainer && trainer.category !== battleTrainerCategory) battleTrainerId = "";
+    if (trainer && trainerCategoryLabel(trainer) !== battleTrainerCategory) battleTrainerId = "";
     if (!battleTrainerId) battleTrainerId = firstTrainerForCategory(battleTrainerCategory)?.id || fresh.battleTrainerId;
     return {
       theme: input.theme === "dark" ? "dark" : "light",
@@ -3049,6 +3448,7 @@
         physicalSplit: typeof input.rules?.physicalSplit === "boolean" ? input.rules.physicalSplit : true,
       },
       caught: sanitizeCaught(input.caught),
+      badges: sanitizeBadges(input.badges),
       team: sanitizeSlots(input.team, blankTeamSlot),
       planner: sanitizeSlots(input.planner, blankPlannerSlot),
       battleMode,
@@ -3067,6 +3467,7 @@
       updatedAt: new Date().toISOString(),
       rules: { fairy: true, physicalSplit: true },
       caught: {},
+      badges: {},
       team: Array.from({ length: 6 }, blankTeamSlot),
       planner: Array.from({ length: 6 }, blankPlannerSlot),
       battleMode: "custom",
@@ -3083,6 +3484,15 @@
       if (value && speciesByName.has(name)) caught[name] = true;
     });
     return caught;
+  }
+
+  function sanitizeBadges(input) {
+    const badges = {};
+    if (!input || typeof input !== "object") return badges;
+    Object.entries(input).forEach(([id, value]) => {
+      if (value && badgeIds.has(id)) badges[id] = true;
+    });
+    return badges;
   }
 
   function sanitizeSlots(input, factory) {
@@ -3116,7 +3526,7 @@
   }
 
   function blankPlannerSlot() {
-    return { species: "", note: "" };
+    return { species: "", ability: "", moves: ["", "", "", ""], nature: "", item: "", nickname: "", note: "" };
   }
 
   function caughtCount() {
@@ -3227,6 +3637,18 @@
   function typePill(type) {
     const color = typeColors[type] || typeColors.Mystery;
     return `<span class="type" style="--type-color:${color}">${text(type)}</span>`;
+  }
+
+  function primaryType(entry) {
+    return entry?.types?.[0] || "";
+  }
+
+  function typeBackdropStyle(entry) {
+    const type = primaryType(entry);
+    const background = typeBackgrounds[type];
+    if (!background) return "";
+    const color = typeColors[type] || typeColors.Mystery;
+    return ` style="--type-bg:url('${background}'); --type-color:${color}"`;
   }
 
   function statBars(stats) {
