@@ -29,8 +29,28 @@ TYPE_FIXES = {
 }
 
 SPECIES_ALIASES = {
+    "DeoxysA": "Deoxys Attack",
+    "DeoxysD": "Deoxys Defense",
+    "DeoxysS": "Deoxys Speed",
+    "Farfetchd": "Farfetch'd",
+    "HoOh": "Ho Oh",
+    "Ho-oh": "Ho Oh",
+    "Mime Jr": "Mime Jr.",
+    "MimeJr": "Mime Jr.",
     "Mr Mime": "Mr. Mime",
+    "MrMime": "Mr. Mime",
+    "Nidoran F": "Nidoran\u2640",
+    "Nidoran Female": "Nidoran\u2640",
+    "NidoranF": "Nidoran\u2640",
+    "Nidoran M": "Nidoran\u2642",
+    "Nidoran Male": "Nidoran\u2642",
+    "NidoranM": "Nidoran\u2642",
+    "Porygon Z": "Porygon-Z",
     "PorygonZ": "Porygon-Z",
+    "Blood Moon Ursaluna": "Ursaluna Bloodmoon",
+    "Bloodmoon Ursaluna": "Ursaluna Bloodmoon",
+    "Ursaluna_BloodMoon": "Ursaluna Bloodmoon",
+    "Special Dratini": "Dratini",
 }
 
 SOURCE_URLS = {
@@ -69,6 +89,10 @@ def clean_species_name(value):
     return SPECIES_ALIASES.get(value, value)
 
 
+def clean_species_names(values):
+    return [clean_species_name(value) for value in values]
+
+
 def split_lines(value):
     if value is None:
         return []
@@ -91,6 +115,7 @@ def sheet_rows(ws, min_row=4):
 def make_id(value):
     text = str(value).strip().lower()
     text = text.replace("&", "and")
+    text = text.replace("\u2640", "-f").replace("\u2642", "-m")
     text = re.sub(r"[^a-z0-9]+", "-", text)
     return text.strip("-")
 
@@ -286,7 +311,7 @@ def parse_encounter_line(line):
     if rate.is_integer():
         rate = int(rate)
     return {
-        "species": species,
+        "species": clean_species_name(species),
         "rate": rate,
         "level": re.sub(r"\s+", " ", match.group(3).strip()),
     }
@@ -330,7 +355,7 @@ def build_species(wb, source_root):
     species = []
     by_name = {}
     for row in sheet_rows(ws):
-        name = row[0]
+        name = clean_species_name(row[0])
         if not name:
             continue
         type1 = clean_type(row[9])
@@ -436,7 +461,7 @@ def build_static(wb, species_by_name):
     ws = wb["Static, Gift, Trade Pokemon"]
     rows = []
     for row in sheet_rows(ws):
-        species_name = row[2]
+        species_name = clean_species_name(row[2])
         entry = {
             "category": row[0],
             "subcategory": row[1],
@@ -484,8 +509,8 @@ def build_items(wb, item_descriptions, move_descriptions):
                 "type": row[1],
                 "move": move_name,
                 "locations": row[3],
-                "wildCommonSpecies": split_semicolon(row[4]),
-                "wildRareSpecies": split_semicolon(row[5]),
+                "wildCommonSpecies": clean_species_names(split_semicolon(row[4])),
+                "wildRareSpecies": clean_species_names(split_semicolon(row[5])),
                 "notes": row[6],
                 "description": description,
             }
@@ -498,23 +523,25 @@ def build_evolutions_and_breeding(wb, species_by_name):
     evolutions = []
     breeding = []
     for row in sheet_rows(ws):
-        if row[0] and row[1]:
+        from_species = clean_species_name(row[0])
+        to_species = clean_species_name(row[1])
+        if from_species and to_species:
             evo = {
-                "from": row[0],
-                "to": row[1],
+                "from": from_species,
+                "to": to_species,
                 "method": row[2],
                 "requirement": row[3],
                 "conditions": row[4],
             }
             evolutions.append(evo)
-            if row[0] in species_by_name:
-                species_by_name[row[0]]["evolutions"].append(evo)
-            if row[1] in species_by_name:
-                species_by_name[row[1]]["evolvesFrom"].append(evo)
+            if from_species in species_by_name:
+                species_by_name[from_species]["evolutions"].append(evo)
+            if to_species in species_by_name:
+                species_by_name[to_species]["evolvesFrom"].append(evo)
         if row[6] and row[7]:
             breeding.append(
                 {
-                    "baby": row[6],
+                    "baby": clean_species_name(row[6]),
                     "parents": row[7],
                     "requirement": row[8],
                     "notes": row[9],
@@ -527,8 +554,10 @@ def build_learnsets(wb, species_by_name):
     ws = wb["Learnsets"]
     learnsets = []
     for row in sheet_rows(ws):
-        name = row[0]
+        name = clean_species_name(row[0])
         if not name:
+            continue
+        if name not in species_by_name:
             continue
         entry = {
             "species": name,
