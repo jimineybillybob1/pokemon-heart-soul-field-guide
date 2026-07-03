@@ -15,7 +15,7 @@
   const syncDeviceKey = "heart-soul-field-guide-sync-device-v1";
   const syncEndpoint = (window.HEART_SOUL_SYNC_ENDPOINT || "").replace(/\/+$/, "");
   const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  const appShellVersion = "heart-soul-field-guide-v22";
+  const appShellVersion = "heart-soul-field-guide-v23";
   const species = [...data.species].sort((a, b) => Number(a.dex || 0) - Number(b.dex || 0));
   const speciesByName = new Map(species.map((entry) => [entry.name, entry]));
   const speciesByLookup = new Map(species.map((entry) => [normalize(entry.name), entry]));
@@ -753,8 +753,7 @@
       selectTeamSpecies(Number(target.dataset.teamSpecies), target.value, { allowClear: true });
     } else if (target.matches("[data-team-ability]")) {
       state.team[Number(target.dataset.teamAbility)].ability = target.value;
-      persist();
-      invalidateViews(["battle", "save"]);
+      persistAndRenderTeam();
     } else if (target.matches("[data-team-nature]")) {
       state.team[Number(target.dataset.teamNature)].nature = naturesByName.has(target.value) ? target.value : "";
       persistAndRenderTeam();
@@ -1738,7 +1737,7 @@
         </header>
         ${
           entry
-            ? `<div class="slot-preview">${sprite(entry)}<div><strong title="${attr(entry.name)}">${text(slot.nickname || entry.name)}</strong><span class="muted">${text(entry.name)}</span><div class="type-row">${entry.types.map(typePill).join("")}</div></div></div>`
+            ? renderSlotIdentity(entry, slot)
             : '<div class="slot-empty">Search for a Pokemon to start this slot.</div>'
         }
         <div class="slot-body">
@@ -1783,6 +1782,45 @@
         </div>
       </article>
     `;
+  }
+
+  function renderSlotIdentity(entry, slot) {
+    return `
+      <div class="slot-identity">
+        <div class="slot-preview">
+          ${sprite(entry)}
+          <div>
+            <strong title="${attr(entry.name)}">${text(slot.nickname || entry.name)}</strong>
+            <span class="muted">${text(entry.name)}</span>
+            <div class="type-row">${entry.types.map(typePill).join("")}</div>
+          </div>
+        </div>
+        ${renderSlotAbilitySummary(entry, slot.ability)}
+      </div>
+    `;
+  }
+
+  function renderSlotAbilitySummary(entry, selected) {
+    const ability = selectedAbilityRecord(entry, selected);
+    if (!ability) return "";
+    return `
+      <aside class="slot-ability-summary">
+        <span>Ability</span>
+        <strong>${text(ability.name)}${ability.hidden ? ' <em>HA</em>' : ""}</strong>
+        <p>${text(abilityDescription(ability.name))}</p>
+      </aside>
+    `;
+  }
+
+  function selectedAbilityRecord(entry, selected) {
+    const abilities = displayAbilities(entry);
+    if (!abilities.length) return null;
+    const selectedAbility = abilities.find((ability) => ability.name === selected);
+    return selectedAbility || abilities.find((ability) => ability.name === defaultAbility(entry)) || abilities[0];
+  }
+
+  function abilityDescription(name) {
+    return abilityDetails[normalize(name)] || "No ability details listed.";
   }
 
   function renderTeamOffensiveSummary() {
@@ -2176,7 +2214,7 @@
         </header>
         ${
           entry
-            ? `<div class="slot-preview">${sprite(entry)}<div><strong title="${attr(entry.name)}">${text(slot.nickname || entry.name)}</strong><span class="muted">${text(entry.name)}</span><div class="type-row">${entry.types.map(typePill).join("")}</div></div></div>`
+            ? renderSlotIdentity(entry, slot)
             : '<div class="slot-empty">Search for a Pokemon to plan this endgame slot.</div>'
         }
         <div class="slot-body">

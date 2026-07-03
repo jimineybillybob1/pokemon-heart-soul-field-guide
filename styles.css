@@ -96,6 +96,7 @@ button,
 .trainer-held-item,
 .team-overview-slot,
 .slot-preview strong,
+.slot-ability-summary,
 .species-suggestion strong,
 .move-section summary,
 .section-count,
@@ -2194,11 +2195,19 @@ summary {
   gap: 5px;
 }
 
+.slot-identity {
+  display: grid;
+  grid-template-columns: minmax(188px, auto) minmax(0, 1fr);
+  gap: 10px;
+  align-items: stretch;
+}
+
 .slot-preview {
   display: grid;
   grid-template-columns: 92px minmax(0, 1fr);
   gap: 12px;
   align-items: center;
+  min-width: 0;
 }
 
 .slot-preview .sprite-box {
@@ -2218,8 +2227,58 @@ summary {
   font-weight: 800;
 }
 
+.slot-ability-summary {
+  min-width: 0;
+  min-height: 92px;
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  padding: 9px 10px;
+}
+
+.slot-ability-summary span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.slot-ability-summary strong {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink);
+  font-size: 0.98rem;
+  line-height: 1.1;
+}
+
+.slot-ability-summary em {
+  display: inline-grid;
+  place-items: center;
+  min-height: 18px;
+  padding: 0 5px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.62rem;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.slot-ability-summary p {
+  margin: 0;
+  color: var(--muted);
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
 .held-item-summary,
 .team-stat-panel,
+.slot-ability-summary,
 .slot-evolution {
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -2310,6 +2369,7 @@ summary {
 
 .evolve-options {
   display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 8px;
 }
 
@@ -2468,6 +2528,21 @@ summary {
   color: #fff;
 }
 
+.type-backed .slot-ability-summary span,
+.type-backed .slot-ability-summary p {
+  color: rgba(234, 242, 255, 0.82);
+}
+
+.type-backed .slot-ability-summary strong {
+  color: #fff;
+}
+
+.type-backed .slot-ability-summary em {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(10, 16, 24, 0.56);
+  color: rgba(245, 249, 255, 0.9);
+}
+
 .type-backed .sprite-box,
 .type-backed .mini-sprite,
 .type-backed .team-overview-sprite {
@@ -2479,6 +2554,7 @@ summary {
 .type-backed .dex-card-section,
 .type-backed .team-stat-panel,
 .type-backed .held-item-summary,
+.type-backed .slot-ability-summary,
 .type-backed .slot-evolution {
   border-color: rgba(255, 255, 255, 0.14);
 }
@@ -3102,6 +3178,11 @@ summary {
   }
 
   .team-field-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .slot-identity,
+  .evolve-options {
     grid-template-columns: 1fr;
   }
 
