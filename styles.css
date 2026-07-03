@@ -807,6 +807,81 @@ img {
   gap: 8px;
 }
 
+.search-input-wrap {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+
+.search-input-wrap input {
+  padding-right: 42px;
+}
+
+.search-clear {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  width: 28px;
+  height: 28px;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  font-weight: 900;
+  line-height: 1;
+  transform: translateY(-50%);
+}
+
+.search-clear:hover,
+.search-clear:focus-visible {
+  border-color: var(--accent-3);
+  color: var(--ink);
+}
+
+.location-quick-filters {
+  flex: 1 0 100%;
+  max-height: 132px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--surface) 72%, var(--surface-2));
+  overflow: auto;
+}
+
+.location-filter-button {
+  min-height: 30px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.location-filter-button:hover,
+.location-filter-button:focus-visible,
+.location-filter-button.is-active,
+.toggle-button.is-active {
+  border-color: var(--accent-3);
+  background: color-mix(in srgb, var(--accent-3) 18%, var(--surface));
+}
+
+.toggle-button.is-active {
+  color: var(--ink);
+}
+
 .field {
   display: grid;
   gap: 4px;
@@ -1340,14 +1415,16 @@ summary {
 }
 
 .location-card-summary {
+  position: relative;
   min-height: 66px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 14px;
+  padding: 18px 14px 14px;
   cursor: pointer;
   list-style: none;
+  overflow: hidden;
 }
 
 .location-card-summary::-webkit-details-marker {
@@ -1380,11 +1457,25 @@ summary {
   margin-right: auto;
 }
 
-.location-card-title small {
-  color: var(--muted);
-  font-family: var(--font-display);
-  font-size: 0.82rem;
-  font-weight: 800;
+.location-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.location-progress-track {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 5px;
+  background: color-mix(in srgb, var(--line) 64%, transparent);
+}
+
+.location-progress-track span {
+  display: block;
+  width: var(--progress, 0%);
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-2), var(--gold));
 }
 
 .location-card-body {

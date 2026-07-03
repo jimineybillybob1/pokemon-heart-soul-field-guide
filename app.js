@@ -15,7 +15,7 @@
   const syncDeviceKey = "heart-soul-field-guide-sync-device-v1";
   const syncEndpoint = (window.HEART_SOUL_SYNC_ENDPOINT || "").replace(/\/+$/, "");
   const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  const appShellVersion = "heart-soul-field-guide-v19";
+  const appShellVersion = "heart-soul-field-guide-v20";
   const species = [...data.species].sort((a, b) => Number(a.dex || 0) - Number(b.dex || 0));
   const speciesByName = new Map(species.map((entry) => [entry.name, entry]));
   const speciesByLookup = new Map(species.map((entry) => [normalize(entry.name), entry]));
@@ -286,6 +286,8 @@
     dexCaughtOnly: false,
     dexSort: "dex",
     locationSearch: "",
+    locationExact: "",
+    locationHideCaught: false,
     itemSearch: "",
     itemType: "",
     moveSearch: "",
@@ -358,6 +360,18 @@
 
       if (event.target.closest("#jump-top")) {
         window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+
+      const clearSearchButton = event.target.closest("[data-clear-search]");
+      if (clearSearchButton) {
+        const input = clearSearchButton.closest(".search-input-wrap")?.querySelector("input");
+        if (input) {
+          input.value = "";
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+          input.dispatchEvent(new Event("change", { bubbles: true }));
+          input.focus();
+        }
         return;
       }
 
@@ -443,6 +457,25 @@
       const locationSectionButton = event.target.closest("[data-location-sections]");
       if (locationSectionButton) {
         setLocationCardsOpen(locationSectionButton.dataset.locationSections === "expand");
+        return;
+      }
+
+      const locationHideCaughtButton = event.target.closest("[data-location-hide-caught]");
+      if (locationHideCaughtButton) {
+        filters.locationHideCaught = !filters.locationHideCaught;
+        renderControls();
+        renderLocations();
+        return;
+      }
+
+      const locationFilterButton = event.target.closest("[data-location-filter]");
+      if (locationFilterButton) {
+        const name = locationFilterButton.dataset.locationFilter || "";
+        filters.locationSearch = name;
+        filters.locationExact = name;
+        if (name) expandedLocations.add(name);
+        renderControls();
+        renderLocations();
         return;
       }
 
@@ -646,6 +679,7 @@
       renderDex();
     } else if (target.matches("#location-search")) {
       filters.locationSearch = target.value;
+      filters.locationExact = "";
       renderLocations();
     } else if (target.matches("#item-search")) {
       filters.itemSearch = target.value;
@@ -807,7 +841,7 @@
       ["spe", "Speed"],
     ];
     els.dexControls.innerHTML = `
-      <label class="field grow"><span>Search</span><input id="dex-search" type="search" placeholder="Pokemon, ability, item, location" value="${attr(filters.dexSearch)}" /></label>
+      <label class="field grow"><span>Search</span>${clearableSearchInput({ id: "dex-search", value: filters.dexSearch, placeholder: "Pokemon, ability, item, location" })}</label>
       <label class="field"><span>Type</span><select id="dex-type">${typeOptions}</select></label>
       <label class="field"><span>Availability</span><select id="dex-availability">
         ${option("", "Any availability")}
@@ -819,18 +853,23 @@
       <label class="field checkbox-field"><span>Progress</span><span class="check-control"><input id="dex-caught-only" type="checkbox" ${filters.dexCaughtOnly ? "checked" : ""} /> Caught only</span></label>
     `;
     els.locationControls.innerHTML = `
-      <label class="field grow"><span>Search</span><input id="location-search" type="search" placeholder="Location, Pokemon, method, time" value="${attr(filters.locationSearch)}" /></label>
+      <label class="field grow"><span>Search</span>${clearableSearchInput({ id: "location-search", value: filters.locationSearch, placeholder: "Location, Pokemon, method, time" })}</label>
       <div class="toolbar-actions">
+        <button class="small-button toggle-button ${filters.locationHideCaught ? "is-active" : ""}" type="button" data-location-hide-caught aria-pressed="${filters.locationHideCaught ? "true" : "false"}">${filters.locationHideCaught ? "Showing uncaught" : "Hide caught"}</button>
         <button class="small-button" type="button" data-location-sections="expand">Expand all</button>
         <button class="small-button" type="button" data-location-sections="collapse">Collapse all</button>
       </div>
+      <div class="location-quick-filters" aria-label="Quick location filters">
+        <button class="location-filter-button ${filters.locationSearch ? "" : "is-active"}" type="button" data-location-filter="">All locations</button>
+        ${data.locations.map((location) => renderLocationFilterButton(location)).join("")}
+      </div>
     `;
     els.itemControls.innerHTML = `
-      <label class="field grow"><span>Search</span><input id="item-search" type="search" placeholder="Item, move, location, held species" value="${attr(filters.itemSearch)}" /></label>
+      <label class="field grow"><span>Search</span>${clearableSearchInput({ id: "item-search", value: filters.itemSearch, placeholder: "Item, move, location, held species" })}</label>
       <label class="field"><span>Type</span><select id="item-type">${option("", "Any type")}${itemTypes.map((type) => option(type, type)).join("")}</select></label>
     `;
     els.moveControls.innerHTML = `
-      <label class="field grow"><span>Search</span><input id="move-search" type="search" placeholder="Move, description, type" value="${attr(filters.moveSearch)}" /></label>
+      <label class="field grow"><span>Search</span>${clearableSearchInput({ id: "move-search", value: filters.moveSearch, placeholder: "Move, description, type" })}</label>
       <label class="field"><span>Type</span><select id="move-type">${typeOptions}</select></label>
       <label class="field"><span>Category</span><select id="move-category">
         ${option("", "Any category")}
@@ -840,8 +879,28 @@
       </select></label>
     `;
     els.trainerControls.innerHTML = `
-      <label class="field grow"><span>Search</span><input id="trainer-search" type="search" placeholder="Boss, group, Pokemon, move" value="${attr(filters.trainerSearch)}" /></label>
+      <label class="field grow"><span>Search</span>${clearableSearchInput({ id: "trainer-search", value: filters.trainerSearch, placeholder: "Boss, group, Pokemon, move" })}</label>
       <label class="field"><span>Category</span><select id="trainer-category">${option("", "Any category")}${trainerCategoryOptions.map((category) => option(category, category)).join("")}</select></label>
+    `;
+  }
+
+  function renderLocationFilterButton(location) {
+    const selected = filters.locationExact === location.name;
+    return `
+      <button class="location-filter-button ${selected ? "is-active" : ""}" type="button" data-location-filter="${attr(location.name)}">
+        ${text(location.name)}
+      </button>
+    `;
+  }
+
+  function clearableSearchInput({ id = "", value = "", placeholder = "", type = "search", attributes = "" } = {}) {
+    const idPart = id ? ` id="${attr(id)}"` : "";
+    const attributePart = attributes ? ` ${attributes}` : "";
+    return `
+      <span class="search-input-wrap">
+        <input${idPart} type="${attr(type)}"${attributePart} value="${attr(value || "")}" placeholder="${attr(placeholder)}" />
+        <button class="search-clear" type="button" data-clear-search aria-label="Clear search">x</button>
+      </span>
     `;
   }
 
@@ -1248,6 +1307,7 @@
 
   function getFilteredLocations() {
     const query = normalize(filters.locationSearch);
+    if (filters.locationExact) return data.locations.filter((location) => location.name === filters.locationExact);
     return data.locations.filter((location) => {
       const haystack = normalize([
         location.name,
@@ -1266,14 +1326,18 @@
   function renderLocationCard(location) {
     const groups = groupLocationRows(location.rows);
     const isOpen = expandedLocations.has(location.name);
+    const progress = locationCatchProgress(location);
     return `
       <details class="location-card" data-location-card="${attr(location.name)}" ${isOpen ? "open" : ""}>
         <summary class="location-card-summary">
+          <span class="location-progress-track" aria-hidden="true"><span style="width:${progress.percent}%"></span></span>
           <span class="location-card-title">
             <h3>${text(location.name)}</h3>
-            <small>${value(groups.length)} time ${groups.length === 1 ? "section" : "sections"}</small>
           </span>
-          <span class="chip">${value(location.speciesCount)} species</span>
+          <span class="location-card-meta">
+            <span class="chip">${value(progress.caught)} / ${value(progress.total)} caught</span>
+            <span class="chip">${value(location.speciesCount)} species</span>
+          </span>
         </summary>
         <div class="location-card-body">
           <div class="location-time-sections">
@@ -1282,6 +1346,18 @@
         </div>
       </details>
     `;
+  }
+
+  function locationCatchProgress(location) {
+    const names = unique(
+      location.rows.flatMap((row) =>
+        Object.values(row.methods || {}).flatMap((encounters) => encounters.map((encounter) => encounter.species)),
+      ),
+    );
+    const caught = names.filter((name) => state.caught[name]).length;
+    const total = names.length || 0;
+    const percent = total ? Math.round((caught / total) * 100) : 0;
+    return { caught, total, percent };
   }
 
   function groupLocationRows(rows) {
@@ -1305,27 +1381,40 @@
   }
 
   function renderLocationTimeSection(group) {
+    const methodSections = group.rows
+      .flatMap((row) => Object.entries(row.methods).map(([method, encounters]) => renderLocationMethod(method, encounters)))
+      .filter(Boolean)
+      .join("");
     const encounterCount = group.rows.reduce(
-      (total, row) => total + Object.values(row.methods).reduce((sum, encounters) => sum + encounters.length, 0),
+      (total, row) =>
+        total +
+        Object.values(row.methods).reduce((sum, encounters) => sum + visibleLocationEncounters(encounters).length, 0),
       0,
     );
     return `
       <details class="location-time-section" open>
         <summary><span>${text(group.time)}</span><span class="section-count">${value(encounterCount)}</span></summary>
         <div class="location-method-list">
-          ${group.rows.flatMap((row) => Object.entries(row.methods).map(([method, encounters]) => renderLocationMethod(method, encounters))).join("")}
+          ${methodSections || '<p class="muted">All listed Pokemon are caught for this time.</p>'}
         </div>
       </details>
     `;
   }
 
   function renderLocationMethod(method, encounters) {
+    const visible = visibleLocationEncounters(encounters);
+    if (!visible.length) return "";
     return `
       <section class="location-method">
         <h4>${text(method)}</h4>
-        <div class="encounter-list">${encounters.map(renderEncounterButton).join("")}</div>
+        <div class="encounter-list">${visible.map(renderEncounterButton).join("")}</div>
       </section>
     `;
+  }
+
+  function visibleLocationEncounters(encounters) {
+    if (!filters.locationHideCaught) return encounters;
+    return encounters.filter((encounter) => !state.caught[encounter.species]);
   }
 
   function setLocationCardsOpen(expand) {
@@ -1660,13 +1749,23 @@
           <div class="team-field-grid">
             <div class="field species-search-field">
               <span>Pokemon</span>
-              <input data-team-species="${index}" value="${attr(slot.species)}" placeholder="Search Pokemon" autocomplete="off" aria-autocomplete="list" aria-controls="team-species-suggestions-${index}" />
+              ${clearableSearchInput({
+                value: slot.species,
+                placeholder: "Search Pokemon",
+                type: "text",
+                attributes: `data-team-species="${index}" autocomplete="off" aria-autocomplete="list" aria-controls="team-species-suggestions-${index}"`,
+              })}
               <div class="species-suggestion-box" id="team-species-suggestions-${index}" data-team-species-suggestions="${index}" hidden></div>
             </div>
             <label class="field"><span>Nickname</span><input data-team-nickname="${index}" value="${attr(slot.nickname || "")}" maxlength="32" placeholder="Optional nickname" /></label>
             <label class="field"><span>Nature</span><select data-team-nature="${index}">${natureOptions(slot.nature)}</select></label>
             <label class="field"><span>Ability</span><select data-team-ability="${index}" ${entry ? "" : "disabled"}>${abilityOptions}</select></label>
-            <label class="field team-item-field"><span>Held item</span><input data-team-item="${index}" list="team-item-list" value="${attr(slot.item || "")}" placeholder="Search held item" autocomplete="off" /></label>
+            <label class="field team-item-field"><span>Held item</span>${clearableSearchInput({
+              value: slot.item || "",
+              placeholder: "Search held item",
+              type: "text",
+              attributes: `data-team-item="${index}" list="team-item-list" autocomplete="off"`,
+            })}</label>
           </div>
           ${renderTeamItemSummary(item)}
           ${entry ? renderTeamStats(entry, slot.nature) : ""}
@@ -2090,13 +2189,23 @@
           <div class="team-field-grid">
             <div class="field species-search-field">
               <span>Pokemon</span>
-              <input data-planner-species="${index}" value="${attr(slot.species)}" placeholder="Search Pokemon" autocomplete="off" aria-autocomplete="list" aria-controls="planner-species-suggestions-${index}" />
+              ${clearableSearchInput({
+                value: slot.species,
+                placeholder: "Search Pokemon",
+                type: "text",
+                attributes: `data-planner-species="${index}" autocomplete="off" aria-autocomplete="list" aria-controls="planner-species-suggestions-${index}"`,
+              })}
               <div class="species-suggestion-box" id="planner-species-suggestions-${index}" data-planner-species-suggestions="${index}" hidden></div>
             </div>
             <label class="field"><span>Nickname</span><input data-planner-nickname="${index}" value="${attr(slot.nickname || "")}" maxlength="32" placeholder="Optional nickname" /></label>
             <label class="field"><span>Nature</span><select data-planner-nature="${index}">${natureOptions(slot.nature)}</select></label>
             <label class="field"><span>Ability</span><select data-planner-ability="${index}" ${entry ? "" : "disabled"}>${abilityOptions}</select></label>
-            <label class="field team-item-field"><span>Held item</span><input data-planner-item="${index}" list="planner-item-list" value="${attr(slot.item || "")}" placeholder="Search held item" autocomplete="off" /></label>
+            <label class="field team-item-field"><span>Held item</span>${clearableSearchInput({
+              value: slot.item || "",
+              placeholder: "Search held item",
+              type: "text",
+              attributes: `data-planner-item="${index}" list="planner-item-list" autocomplete="off"`,
+            })}</label>
           </div>
           ${renderPlannerItemSummary(item)}
           ${entry ? renderTeamStats(entry, slot.nature) : ""}
@@ -2668,6 +2777,7 @@
   function jumpToLocation(name) {
     closeModal();
     filters.locationSearch = name;
+    filters.locationExact = name;
     expandedLocations.add(name);
     renderControls();
     renderLocations();
