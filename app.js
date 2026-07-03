@@ -15,7 +15,7 @@
   const syncDeviceKey = "heart-soul-field-guide-sync-device-v1";
   const syncEndpoint = (window.HEART_SOUL_SYNC_ENDPOINT || "").replace(/\/+$/, "");
   const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  const appShellVersion = "heart-soul-field-guide-v21";
+  const appShellVersion = "heart-soul-field-guide-v22";
   const species = [...data.species].sort((a, b) => Number(a.dex || 0) - Number(b.dex || 0));
   const speciesByName = new Map(species.map((entry) => [entry.name, entry]));
   const speciesByLookup = new Map(species.map((entry) => [normalize(entry.name), entry]));
@@ -269,7 +269,10 @@
   const dexBatchSize = 50;
   let dexVisibleCount = dexBatchSize;
   let dexFilteredCount = species.length;
-  let currentViewId = "dex";
+  const viewIds = ["dex", "locations", "items", "moves", "trainers", "team", "planner", "battle", "save"];
+  let currentViewId = initialViewId();
+  const renderedViews = new Set();
+  const dirtyViews = new Set(viewIds);
   let syncCode = uuidPattern.test(localStorage.getItem(syncCodeKey) || "") ? localStorage.getItem(syncCodeKey) : "";
   let syncContext = loadSyncContext();
   let syncSnapshot = null;
@@ -336,17 +339,10 @@
     renderThemeToggle();
     updateCounts();
     renderControls();
-    renderDex();
-    renderLocations();
-    renderItems();
-    renderMoves();
-    renderTrainers();
     renderRules();
-    renderTeam();
-    renderPlanner();
-    renderBattlePlanner();
-    renderSave();
+    renderTeamOverview();
     bindEvents();
+    showView(currentViewId, { scroll: false, replaceHistory: false });
   }
 
   function bindEvents() {
@@ -398,7 +394,7 @@
         state.badges[badgeId] = !state.badges[badgeId];
         persist();
         renderDashboard();
-        renderSave();
+        invalidateView("save");
         return;
       }
 
@@ -409,9 +405,7 @@
         state.caught[name] = !state.caught[name];
         persist();
         renderDashboard();
-        renderDex();
-        renderLocations();
-        renderSave();
+        invalidateViews(["dex", "locations", "save"]);
         if (modalSpecies) openSpeciesModal(name);
         return;
       }
@@ -464,7 +458,7 @@
       if (locationHideCaughtButton) {
         filters.locationHideCaught = !filters.locationHideCaught;
         renderControls();
-        renderLocations();
+        renderView("locations", { force: true });
         return;
       }
 
@@ -475,7 +469,7 @@
         filters.locationExact = name;
         if (name) expandedLocations.add(name);
         renderControls();
-        renderLocations();
+        renderView("locations", { force: true });
         return;
       }
 
@@ -699,12 +693,12 @@
       state.team[index].nickname = cleanTeamNickname(target.value);
       persist();
       renderTeamOverview();
-      renderSave();
+      invalidateView("save");
     } else if (target.matches("[data-planner-nickname]")) {
       const index = Number(target.dataset.plannerNickname);
       state.planner[index].nickname = cleanTeamNickname(target.value);
       persist();
-      renderSave();
+      invalidateView("save");
     } else if (target.matches("[data-planner-note]")) {
       const index = Number(target.dataset.plannerNote);
       state.planner[index].note = target.value;
@@ -754,16 +748,13 @@
       state.rules[target.dataset.rule] = target.checked;
       persist();
       renderRules();
-      renderTeam();
-      renderBattlePlanner();
-      renderSave();
+      invalidateViews(["team", "battle", "save"]);
     } else if (target.matches("[data-team-species]")) {
       selectTeamSpecies(Number(target.dataset.teamSpecies), target.value, { allowClear: true });
     } else if (target.matches("[data-team-ability]")) {
       state.team[Number(target.dataset.teamAbility)].ability = target.value;
       persist();
-      renderBattlePlanner();
-      renderSave();
+      invalidateViews(["battle", "save"]);
     } else if (target.matches("[data-team-nature]")) {
       state.team[Number(target.dataset.teamNature)].nature = naturesByName.has(target.value) ? target.value : "";
       persistAndRenderTeam();
@@ -793,26 +784,22 @@
       state.battleMode = target.value === "trainer" ? "trainer" : "custom";
       if (state.battleMode === "trainer") ensureSelectedTrainer();
       persist();
-      renderBattlePlanner();
-      renderSave();
+      invalidateViews(["battle", "save"]);
     } else if (target.matches("#battle-trainer-category")) {
       state.battleTrainerCategory = target.value;
       state.battleTrainerId = firstTrainerForCategory(target.value)?.id || "";
       persist();
-      renderBattlePlanner();
-      renderSave();
+      invalidateViews(["battle", "save"]);
     } else if (target.matches("#battle-trainer-id")) {
       state.battleTrainerId = target.value;
       const trainer = trainersById.get(target.value);
       state.battleTrainerCategory = trainer ? trainerCategoryLabel(trainer) : state.battleTrainerCategory;
       persist();
-      renderBattlePlanner();
-      renderSave();
+      invalidateViews(["battle", "save"]);
     } else if (target.matches("[data-battle-target]")) {
       state.battleTargets[Number(target.dataset.battleTarget)] = target.value;
       persist();
-      renderBattlePlanner();
-      renderSave();
+      invalidateViews(["battle", "save"]);
     } else if (target.matches("#import-save-file")) {
       importSave(target.files?.[0]);
       target.value = "";
@@ -1881,8 +1868,7 @@
     persistAndRenderTeam();
     if (caughtChanged) {
       updateCounts();
-      renderDex();
-      renderLocations();
+      invalidateViews(["dex", "locations"]);
     }
   }
 
@@ -1996,7 +1982,7 @@
     persist();
     const summary = target?.closest(".slot-card")?.querySelector("[data-planner-item-summary]");
     if (summary) summary.outerHTML = renderPlannerItemSummary(item);
-    renderSave();
+    invalidateView("save");
   }
 
   function renderPlannerItemSummary(item) {
@@ -2020,7 +2006,7 @@
     persist();
     const summary = target?.closest(".slot-card")?.querySelector("[data-team-item-summary]");
     if (summary) summary.outerHTML = renderTeamItemSummary(item);
-    renderSave();
+    invalidateView("save");
   }
 
   function renderTeamItemSummary(item) {
@@ -2152,8 +2138,7 @@
     state.caught[target.name] = true;
     persistAndRenderTeam();
     updateCounts();
-    renderDex();
-    renderLocations();
+    invalidateViews(["dex", "locations"]);
     setSaveStatus(`${target.name} evolved and marked caught.`, "success");
   }
 
@@ -2652,14 +2637,49 @@
     `;
   }
 
-  function showView(viewId) {
+  function initialViewId() {
+    const hashView = String(window.location.hash || "").replace(/^#/, "");
+    return viewIds.includes(hashView) ? hashView : "dex";
+  }
+
+  function renderView(viewId, { force = false } = {}) {
+    if (!viewIds.includes(viewId)) return;
+    if (!force && renderedViews.has(viewId) && !dirtyViews.has(viewId)) return;
+
+    if (viewId === "dex") renderDex();
+    else if (viewId === "locations") renderLocations();
+    else if (viewId === "items") renderItems();
+    else if (viewId === "moves") renderMoves();
+    else if (viewId === "trainers") renderTrainers();
+    else if (viewId === "team") renderTeam();
+    else if (viewId === "planner") renderPlanner();
+    else if (viewId === "battle") renderBattlePlanner();
+    else if (viewId === "save") renderSave();
+
+    renderedViews.add(viewId);
+    dirtyViews.delete(viewId);
+  }
+
+  function invalidateView(viewId, { renderCurrent = true } = {}) {
+    if (!viewIds.includes(viewId)) return;
+    dirtyViews.add(viewId);
+    if (renderCurrent && currentViewId === viewId) renderView(viewId, { force: true });
+  }
+
+  function invalidateViews(ids, options) {
+    ids.forEach((id) => invalidateView(id, { ...options, renderCurrent: false }));
+    if (options?.renderCurrent !== false && ids.includes(currentViewId)) renderView(currentViewId, { force: true });
+  }
+
+  function showView(viewId, { scroll = true, replaceHistory = true } = {}) {
     if (!viewId) return;
     if (!els.views.some((view) => view.id === `view-${viewId}`)) viewId = "dex";
     currentViewId = viewId;
     els.tabs.forEach((tab) => tab.classList.toggle("is-active", tab.dataset.view === viewId));
     els.views.forEach((view) => view.classList.toggle("is-active", view.id === `view-${viewId}`));
-    history.replaceState(null, "", `#${viewId}`);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    renderView(viewId);
+    if (replaceHistory) history.replaceState(null, "", `#${viewId}`);
+    if (scroll) window.scrollTo({ top: 0, behavior: "smooth" });
     updateJumpTop();
   }
 
@@ -2743,8 +2763,7 @@
     persistAndRenderTeam();
     if (caughtChanged) {
       updateCounts();
-      renderDex();
-      renderLocations();
+      invalidateViews(["dex", "locations"]);
     }
     showView("team");
   }
@@ -2779,7 +2798,7 @@
     filters.dexCaughtOnly = false;
     resetDexLimit();
     renderControls();
-    renderDex();
+    invalidateView("dex", { renderCurrent: false });
     showView("dex");
   }
 
@@ -2789,7 +2808,7 @@
     filters.locationExact = name;
     expandedLocations.add(name);
     renderControls();
-    renderLocations();
+    invalidateView("locations", { renderCurrent: false });
     showView("locations");
   }
 
@@ -2798,7 +2817,7 @@
     filters.itemSearch = search;
     filters.itemType = "";
     renderControls();
-    renderItems();
+    invalidateView("items", { renderCurrent: false });
     showView("items");
   }
 
@@ -2808,9 +2827,9 @@
     filters.moveType = "";
     filters.moveCategory = "";
     renderControls();
-    renderMoves();
-    setMoveSectionsOpen(true);
+    invalidateView("moves", { renderCurrent: false });
     showView("moves");
+    setMoveSectionsOpen(true);
   }
 
   function planTrainerBattle(trainerId) {
@@ -2820,8 +2839,7 @@
     state.battleTrainerCategory = trainerCategoryLabel(trainer);
     state.battleTrainerId = trainer.id;
     persist();
-    renderBattlePlanner();
-    renderSave();
+    invalidateViews(["battle", "save"], { renderCurrent: false });
     showView("battle");
   }
 
@@ -2933,27 +2951,23 @@
 
   function persistAndRenderTeam() {
     persist();
-    renderTeam();
-    renderBattlePlanner();
-    renderSave();
+    renderTeamOverview();
+    invalidateViews(["team", "battle", "save"]);
   }
 
   function persistAndRenderPlanner() {
     persist();
-    renderPlanner();
-    renderSave();
+    invalidateViews(["planner", "save"]);
   }
 
   function rerenderStateful() {
     document.documentElement.dataset.theme = state.theme;
     renderThemeToggle();
     updateCounts();
+    renderControls();
     renderRules();
-    renderDex();
-    renderTeam();
-    renderPlanner();
-    renderBattlePlanner();
-    renderSave();
+    renderTeamOverview();
+    invalidateViews(viewIds);
   }
 
   function makeSaveDocument({ parentRevision = syncContext.lastSyncedRevision } = {}) {
