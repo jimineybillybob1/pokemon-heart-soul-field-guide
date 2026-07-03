@@ -16,7 +16,7 @@
   const defaultSyncEndpoint = "https://heart-soul-field-guide-sync.james-stewart1992.workers.dev";
   const syncEndpoint = (window.HEART_SOUL_SYNC_ENDPOINT || defaultSyncEndpoint).replace(/\/+$/, "");
   const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  const appShellVersion = "heart-soul-field-guide-v24";
+  const appShellVersion = "heart-soul-field-guide-v25";
   const species = [...data.species].sort((a, b) => Number(a.dex || 0) - Number(b.dex || 0));
   const speciesByName = new Map(species.map((entry) => [entry.name, entry]));
   const speciesByLookup = new Map(species.map((entry) => [normalize(entry.name), entry]));
@@ -392,10 +392,13 @@
       if (badgeButton) {
         const badgeId = badgeButton.dataset.badge;
         if (!badgeIds.has(badgeId)) return;
-        state.badges[badgeId] = !state.badges[badgeId];
+        const wasObtained = Boolean(state.badges[badgeId]);
+        const origin = celebrationOrigin(badgeButton);
+        state.badges[badgeId] = !wasObtained;
         persist();
         renderDashboard();
         invalidateView("save");
+        if (!wasObtained) celebrate(origin, "🎆");
         return;
       }
 
@@ -403,11 +406,14 @@
       if (caughtButton) {
         const name = caughtButton.dataset.caught;
         const modalSpecies = caughtButton.closest("[data-species-modal]")?.dataset.speciesModal;
-        state.caught[name] = !state.caught[name];
+        const wasCaught = Boolean(state.caught[name]);
+        const origin = celebrationOrigin(caughtButton);
+        state.caught[name] = !wasCaught;
         persist();
         renderDashboard();
         invalidateViews(["dex", "locations", "save"]);
         if (modalSpecies) openSpeciesModal(name);
+        if (!wasCaught) celebrate(origin, "🎉");
         return;
       }
 
@@ -2171,6 +2177,7 @@
     if (!slot || !target) return;
     const availableMoves = new Set(compatibleMoves(target));
     const availableAbilities = displayAbilities(target).map((ability) => ability.name);
+    const wasCaught = Boolean(state.caught[target.name]);
     slot.species = target.name;
     slot.ability = availableAbilities.includes(slot.ability) ? slot.ability : defaultAbility(target);
     slot.moves = slot.moves.map((move) => (availableMoves.has(move) ? move : ""));
@@ -2178,6 +2185,7 @@
     persistAndRenderTeam();
     updateCounts();
     invalidateViews(["dex", "locations"]);
+    if (!wasCaught) celebrate(null, "🎉");
     setSaveStatus(`${target.name} evolved and marked caught.`, "success");
   }
 
@@ -2811,6 +2819,7 @@
     if (!entry || state.caught[entry.name]) return false;
     if (!confirm(`${entry.name} is not marked caught yet. Mark it caught in the Dex?`)) return false;
     state.caught[entry.name] = true;
+    celebrate(null, "🎉");
     return true;
   }
 
@@ -3578,6 +3587,52 @@
     bytes[8] = (bytes[8] & 0x3f) | 0x80;
     const hex = bytesToHex(bytes);
     return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  }
+
+  function celebrationOrigin(element) {
+    if (!element) return null;
+    const rect = element.getBoundingClientRect();
+    return {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    };
+  }
+
+  function celebrate(origin, emoji = "🎉") {
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    const point = origin || {
+      x: window.innerWidth / 2,
+      y: Math.min(window.innerHeight * 0.36, 320),
+    };
+    const layer = document.createElement("div");
+    layer.className = "celebration-layer";
+    layer.setAttribute("aria-hidden", "true");
+    const burst = document.createElement("span");
+    burst.className = "celebration-emoji";
+    burst.textContent = emoji;
+    burst.style.left = `${point.x}px`;
+    burst.style.top = `${point.y}px`;
+    layer.append(burst);
+
+    const colors = ["#68e5a8", "#ffd36a", "#6db6ec", "#ff7b87", "#c69cff", "#fffaf0"];
+    for (let index = 0; index < 28; index += 1) {
+      const angle = (Math.PI * 2 * index) / 28 + Math.random() * 0.34;
+      const distance = 48 + Math.random() * 86;
+      const piece = document.createElement("span");
+      piece.className = "celebration-piece";
+      piece.style.left = `${point.x}px`;
+      piece.style.top = `${point.y}px`;
+      piece.style.setProperty("--x", `${Math.cos(angle) * distance}px`);
+      piece.style.setProperty("--y", `${Math.sin(angle) * distance - 28}px`);
+      piece.style.setProperty("--r", `${Math.random() * 220 - 110}deg`);
+      piece.style.setProperty("--delay", `${Math.random() * 80}ms`);
+      piece.style.background = colors[index % colors.length];
+      piece.style.color = colors[index % colors.length];
+      layer.append(piece);
+    }
+
+    document.body.append(layer);
+    window.setTimeout(() => layer.remove(), 1500);
   }
 
   function setSaveStatus(message, type = "") {
