@@ -30,7 +30,7 @@ jobs:
         env:
           HEART_SOUL_SYNC_ENDPOINT: ${{ vars.HEART_SOUL_SYNC_ENDPOINT }}
         run: |
-          node -e "require('fs').writeFileSync('sync-config.js', 'window.HEART_SOUL_SYNC_ENDPOINT = ' + JSON.stringify(process.env.HEART_SOUL_SYNC_ENDPOINT || '') + ';\n')"
+          node -e "const endpoint = process.env.HEART_SOUL_SYNC_ENDPOINT || 'https://heart-soul-field-guide-sync.james-stewart1992.workers.dev'; require('fs').writeFileSync('sync-config.js', 'window.HEART_SOUL_SYNC_ENDPOINT = ' + JSON.stringify(endpoint) + ';\n')"
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v5
         with:

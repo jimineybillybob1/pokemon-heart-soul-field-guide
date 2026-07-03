@@ -13,9 +13,10 @@
   const syncCodeKey = "heart-soul-field-guide-sync-code";
   const syncContextKey = "heart-soul-field-guide-sync-context-v1";
   const syncDeviceKey = "heart-soul-field-guide-sync-device-v1";
-  const syncEndpoint = (window.HEART_SOUL_SYNC_ENDPOINT || "").replace(/\/+$/, "");
+  const defaultSyncEndpoint = "https://heart-soul-field-guide-sync.james-stewart1992.workers.dev";
+  const syncEndpoint = (window.HEART_SOUL_SYNC_ENDPOINT || defaultSyncEndpoint).replace(/\/+$/, "");
   const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  const appShellVersion = "heart-soul-field-guide-v23";
+  const appShellVersion = "heart-soul-field-guide-v24";
   const species = [...data.species].sort((a, b) => Number(a.dex || 0) - Number(b.dex || 0));
   const speciesByName = new Map(species.map((entry) => [entry.name, entry]));
   const speciesByLookup = new Map(species.map((entry) => [normalize(entry.name), entry]));
