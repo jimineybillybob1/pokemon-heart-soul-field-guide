@@ -15,7 +15,7 @@
   const syncDeviceKey = "heart-soul-field-guide-sync-device-v1";
   const syncEndpoint = (window.HEART_SOUL_SYNC_ENDPOINT || "").replace(/\/+$/, "");
   const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  const appShellVersion = "heart-soul-field-guide-v18";
+  const appShellVersion = "heart-soul-field-guide-v19";
   const species = [...data.species].sort((a, b) => Number(a.dex || 0) - Number(b.dex || 0));
   const speciesByName = new Map(species.map((entry) => [entry.name, entry]));
   const speciesByLookup = new Map(species.map((entry) => [normalize(entry.name), entry]));
@@ -275,6 +275,7 @@
   let syncSnapshot = null;
   let syncStatus = "unchecked";
   let cloudHistory = [];
+  const expandedLocations = new Set();
   const deviceId = loadDeviceId();
 
   const state = loadState();
@@ -319,7 +320,6 @@
     plannerGrid: document.querySelector("#planner-grid"),
     battleTargets: document.querySelector("#battle-targets"),
     battleResults: document.querySelector("#battle-results"),
-    moreGrid: document.querySelector("#more-grid"),
     savePanel: document.querySelector("#save-panel"),
     modalRoot: document.querySelector("#modal-root"),
     themeToggle: document.querySelector("#theme-toggle"),
@@ -343,7 +343,6 @@
     renderTeam();
     renderPlanner();
     renderBattlePlanner();
-    renderMore();
     renderSave();
     bindEvents();
   }
@@ -438,6 +437,12 @@
       const speciesOpen = event.target.closest("[data-open-species]");
       if (speciesOpen) {
         openSpeciesModal(speciesOpen.dataset.openSpecies);
+        return;
+      }
+
+      const locationSectionButton = event.target.closest("[data-location-sections]");
+      if (locationSectionButton) {
+        setLocationCardsOpen(locationSectionButton.dataset.locationSections === "expand");
         return;
       }
 
@@ -601,6 +606,18 @@
       }
       if (event.key === "Escape") closeModal();
     });
+    document.addEventListener(
+      "toggle",
+      (event) => {
+        const details = event.target;
+        if (!(details instanceof HTMLDetailsElement) || !details.matches("[data-location-card]")) return;
+        const name = details.dataset.locationCard;
+        if (!name) return;
+        if (details.open) expandedLocations.add(name);
+        else expandedLocations.delete(name);
+      },
+      true,
+    );
     if (window.addEventListener) {
       window.addEventListener("scroll", handleScroll, { passive: true });
     }
@@ -803,6 +820,10 @@
     `;
     els.locationControls.innerHTML = `
       <label class="field grow"><span>Search</span><input id="location-search" type="search" placeholder="Location, Pokemon, method, time" value="${attr(filters.locationSearch)}" /></label>
+      <div class="toolbar-actions">
+        <button class="small-button" type="button" data-location-sections="expand">Expand all</button>
+        <button class="small-button" type="button" data-location-sections="collapse">Collapse all</button>
+      </div>
     `;
     els.itemControls.innerHTML = `
       <label class="field grow"><span>Search</span><input id="item-search" type="search" placeholder="Item, move, location, held species" value="${attr(filters.itemSearch)}" /></label>
@@ -1007,6 +1028,7 @@
 
   function renderLocationChipGroup(label, locations, limit) {
     const visible = locations.slice(0, limit);
+    const hidden = locations.slice(limit);
     const chips = visible
       .map(
         (location, index) => `
@@ -1016,7 +1038,22 @@
         `,
       )
       .join("");
-    const extra = locations.length > limit ? `<span class="chip">+${locations.length - limit}</span>` : "";
+    const extra = hidden.length
+      ? `
+        <details class="location-chip-disclosure">
+          <summary class="chip">+${hidden.length}</summary>
+          <div class="chip-row location-chip-extra">
+            ${hidden
+              .map(
+                (location) => `
+                  <button class="chip link-chip" type="button" data-jump-location="${attr(location)}">${text(location)}</button>
+                `,
+              )
+              .join("")}
+          </div>
+        </details>
+      `
+      : "";
     return `${chips}${extra}`;
   }
 
@@ -1069,19 +1106,19 @@
           </div>
         </header>
         <div class="species-modal-body">
-          <section class="species-panel">
+          <section class="species-panel species-panel-stats">
             <h4>Stats</h4>
             <div class="stat-bars">${statBars(entry.stats)}</div>
           </section>
-          <section class="species-panel">
+          <section class="species-panel species-panel-abilities">
             <h4>Abilities</h4>
             <div class="chip-row ability-row">${abilities.length ? abilities.map(renderAbilityButton).join("") : '<span class="chip">No ability listed</span>'}</div>
           </section>
-          <section class="species-panel">
+          <section class="species-panel species-panel-evolution">
             <h4>Evolution</h4>
             ${renderEvolutionLinks(entry)}
           </section>
-          <section class="species-panel">
+          <section class="species-panel species-panel-locations">
             <h4>Locations</h4>
             ${renderAvailability(entry)}
           </section>
@@ -1204,8 +1241,14 @@
   }
 
   function renderLocations() {
+    const filtered = getFilteredLocations();
+    els.locationCount.textContent = `Showing ${filtered.length} of ${data.locations.length}`;
+    els.locationList.innerHTML = filtered.map(renderLocationCard).join("") || empty("No locations match that search.");
+  }
+
+  function getFilteredLocations() {
     const query = normalize(filters.locationSearch);
-    const filtered = data.locations.filter((location) => {
+    return data.locations.filter((location) => {
       const haystack = normalize([
         location.name,
         ...location.rows.flatMap((row) => [
@@ -1218,22 +1261,26 @@
       ].join(" "));
       return !query || haystack.includes(query);
     });
-    els.locationCount.textContent = `Showing ${filtered.length} of ${data.locations.length}`;
-    els.locationList.innerHTML = filtered.map(renderLocationCard).join("") || empty("No locations match that search.");
   }
 
   function renderLocationCard(location) {
     const groups = groupLocationRows(location.rows);
+    const isOpen = expandedLocations.has(location.name);
     return `
-      <article class="location-card" data-location-card="${attr(location.name)}">
-        <header>
-          <h3>${text(location.name)}</h3>
+      <details class="location-card" data-location-card="${attr(location.name)}" ${isOpen ? "open" : ""}>
+        <summary class="location-card-summary">
+          <span class="location-card-title">
+            <h3>${text(location.name)}</h3>
+            <small>${value(groups.length)} time ${groups.length === 1 ? "section" : "sections"}</small>
+          </span>
           <span class="chip">${value(location.speciesCount)} species</span>
-        </header>
-        <div class="location-time-sections">
-          ${groups.map(renderLocationTimeSection).join("")}
+        </summary>
+        <div class="location-card-body">
+          <div class="location-time-sections">
+            ${groups.map(renderLocationTimeSection).join("")}
+          </div>
         </div>
-      </article>
+      </details>
     `;
   }
 
@@ -1279,6 +1326,15 @@
         <div class="encounter-list">${encounters.map(renderEncounterButton).join("")}</div>
       </section>
     `;
+  }
+
+  function setLocationCardsOpen(expand) {
+    if (expand) {
+      getFilteredLocations().forEach((location) => expandedLocations.add(location.name));
+    } else {
+      expandedLocations.clear();
+    }
+    renderLocations();
   }
 
   function renderEncounterButton(encounter) {
@@ -2370,44 +2426,6 @@
     `;
   }
 
-  function renderMore() {
-    els.moreGrid.innerHTML = `
-      <article class="more-card">
-        <header><h3>FAQ</h3><span class="chip">${data.faq.length} entries</span></header>
-        ${data.faq
-          .map(
-            (item) => `
-              <details>
-                <summary>${text(item.question)}</summary>
-                <div class="detail-block"><p>${text(joinParts([item.answer, item.detail]))}</p></div>
-              </details>
-            `,
-          )
-          .join("")}
-      </article>
-      <article class="more-card">
-        <header><h3>Completion</h3></header>
-        <div class="mini-list">${data.completion.map((item) => `<span class="chip">${text(item.subcategory)}: ${text(item.requirement)}</span>`).join("")}</div>
-      </article>
-      <article class="more-card">
-        <header><h3>Gym Rematches</h3></header>
-        <div class="table-wrap">${simpleTable(data.rematches, ["leader", "location", "when"])}</div>
-      </article>
-      <article class="more-card">
-        <header><h3>Move Tutors</h3><span class="chip">${data.tutors.length}</span></header>
-        <div class="table-wrap">${simpleTable(data.tutors, ["move", "location", "cost"])}</div>
-      </article>
-      <article class="more-card">
-        <header><h3>Berries and Kurt Balls</h3><span class="chip">${data.berries.length}</span></header>
-        <div class="table-wrap">${simpleTable(data.berries, ["berry", "function", "location", "ball", "ballEffectiveness"])}</div>
-      </article>
-      <article class="more-card">
-        <header><h3>Credits</h3></header>
-        <div class="table-wrap">${simpleTable(data.credits, ["role", "names"])}</div>
-      </article>
-    `;
-  }
-
   function renderSave() {
     const save = makeSaveDocument();
     const backups = getLocalBackups();
@@ -2518,6 +2536,7 @@
 
   function showView(viewId) {
     if (!viewId) return;
+    if (!els.views.some((view) => view.id === `view-${viewId}`)) viewId = "dex";
     currentViewId = viewId;
     els.tabs.forEach((tab) => tab.classList.toggle("is-active", tab.dataset.view === viewId));
     els.views.forEach((view) => view.classList.toggle("is-active", view.id === `view-${viewId}`));
@@ -2649,6 +2668,7 @@
   function jumpToLocation(name) {
     closeModal();
     filters.locationSearch = name;
+    expandedLocations.add(name);
     renderControls();
     renderLocations();
     showView("locations");
