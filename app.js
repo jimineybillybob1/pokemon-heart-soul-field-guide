@@ -15,7 +15,7 @@
   const syncDeviceKey = "heart-soul-field-guide-sync-device-v1";
   const syncEndpoint = (window.HEART_SOUL_SYNC_ENDPOINT || "").replace(/\/+$/, "");
   const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  const appShellVersion = "heart-soul-field-guide-v20";
+  const appShellVersion = "heart-soul-field-guide-v21";
   const species = [...data.species].sort((a, b) => Number(a.dex || 0) - Number(b.dex || 0));
   const speciesByName = new Map(species.map((entry) => [entry.name, entry]));
   const speciesByLookup = new Map(species.map((entry) => [normalize(entry.name), entry]));
@@ -1307,8 +1307,11 @@
 
   function getFilteredLocations() {
     const query = normalize(filters.locationSearch);
-    if (filters.locationExact) return data.locations.filter((location) => location.name === filters.locationExact);
+    if (filters.locationExact) {
+      return data.locations.filter((location) => location.name === filters.locationExact && locationHasUncaughtSpecies(location));
+    }
     return data.locations.filter((location) => {
+      if (!locationHasUncaughtSpecies(location)) return false;
       const haystack = normalize([
         location.name,
         ...location.rows.flatMap((row) => [
@@ -1321,6 +1324,12 @@
       ].join(" "));
       return !query || haystack.includes(query);
     });
+  }
+
+  function locationHasUncaughtSpecies(location) {
+    if (!filters.locationHideCaught) return true;
+    const progress = locationCatchProgress(location);
+    return progress.caught < progress.total;
   }
 
   function renderLocationCard(location) {
