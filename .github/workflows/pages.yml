@@ -23,18 +23,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Configure Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
       - name: Configure optional cloud sync endpoint
         env:
           HEART_SOUL_SYNC_ENDPOINT: ${{ vars.HEART_SOUL_SYNC_ENDPOINT }}
         run: |
           node -e "require('fs').writeFileSync('sync-config.js', 'window.HEART_SOUL_SYNC_ENDPOINT = ' + JSON.stringify(process.env.HEART_SOUL_SYNC_ENDPOINT || '') + ';\n')"
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: .
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
