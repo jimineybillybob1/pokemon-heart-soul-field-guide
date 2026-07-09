@@ -65,6 +65,7 @@
       <nav class="tabs" aria-label="Guide sections">
         <button class="tab is-active" type="button" data-view="dex"><img class="tab-icon" src="assets/nav/rule_book.png" alt="" /> <span>Full Dex</span></button>
         <button class="tab" type="button" data-view="locations"><img class="tab-icon" src="assets/nav/town_map.png" alt="" /> <span>Locations</span></button>
+        <button class="tab" type="button" data-view="legendaries"><img class="tab-icon" src="assets/items/s_s_ticket.png" alt="" /> <span>Legendaries</span></button>
         <button class="tab" type="button" data-view="items"><img class="tab-icon" src="assets/nav/bag.png" alt="" /> <span>Items</span></button>
         <button class="tab" type="button" data-view="moves"><img class="tab-icon" src="assets/nav/tm_case.png" alt="" /> <span>Moves</span></button>
         <button class="tab" type="button" data-view="trainers"><img class="tab-icon" src="assets/nav/vs_seeker.png" alt="" /> <span>Boss Battles</span></button>
@@ -98,6 +99,32 @@
         </div>
         <div class="toolbar" id="location-controls"></div>
         <div class="location-list" id="location-list"></div>
+      </section>
+
+      <section class="view" id="view-legendaries" aria-labelledby="legendaries-heading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Legendary hunts</p>
+            <h2 id="legendaries-heading">Legendaries</h2>
+          </div>
+          <p id="legendary-count" class="result-count"></p>
+        </div>
+        <div class="legendary-milestones" aria-label="Legendary unlock milestones">
+          <article>
+            <strong>First League clear</strong>
+            <span>Ride the S.S. Aqua to begin Kanto and reveal most stationary encounters.</span>
+          </article>
+          <article>
+            <strong>Power Plant restored</strong>
+            <span>Return the Machine Part to unlock special destinations from Vermilion Port.</span>
+          </article>
+          <article>
+            <strong>Second League clear</strong>
+            <span>Unlock the Kanto Champion rewards: the GS Ball, Aurora Ticket, and Eon Ticket.</span>
+          </article>
+        </div>
+        <div class="toolbar legendary-toolbar" id="legendary-controls"></div>
+        <div class="legendary-list" id="legendary-list"></div>
       </section>
 
       <section class="view" id="view-items" aria-labelledby="items-heading">

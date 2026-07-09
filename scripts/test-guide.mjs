@@ -44,6 +44,27 @@ const selectedTeam = await page.locator("#team-grid .slot-card").first().textCon
 await page.click("[data-view=\"locations\"]");
 const locationVisible = await page.locator("#view-locations.is-active").count();
 
+await page.click("[data-view=\"legendaries\"]");
+const legendaryVisible = await page.locator("#view-legendaries.is-active").count();
+const legendaryCards = await page.locator(".legendary-card").count();
+const legendaryInitiallyOpen = await page.locator(".legendary-card[open]").count();
+const legendaryFilterSprites = await page.locator(".legendary-filter-button img").count();
+await page.click("[data-legendary-filter=\"ho-oh\"]");
+const filteredLegendaryCards = await page.locator(".legendary-card").count();
+const filteredLegendaryOpen = await page.locator(".legendary-card[open]").count();
+const legendaryDetailsVisible =
+  (await page.locator("[data-legendary-section=\"ho-oh\"] .legendary-pokemon-details").count()) === 1 &&
+  (await page.locator("[data-legendary-section=\"ho-oh\"] .stat-line").count()) === 6 &&
+  (await page.locator("[data-legendary-section=\"ho-oh\"] [data-open-moves=\"Ho Oh\"]").count()) === 1;
+await page.click("[data-legendary-section=\"ho-oh\"] [data-caught=\"Ho Oh\"]");
+const legendaryCaught = await page.textContent("[data-legendary-section=\"ho-oh\"] [data-caught=\"Ho Oh\"]");
+const legendaryStayedOpen = await page.locator("[data-legendary-section=\"ho-oh\"][open]").count();
+await page.click("[data-legendary-filter=\"\"]");
+await page.click("[data-legendary-sections=\"collapse\"]");
+const legendaryCollapsed = await page.locator(".legendary-card[open]").count();
+await page.click("[data-legendary-sections=\"expand\"]");
+const legendaryExpanded = await page.locator(".legendary-card[open]").count();
+
 await browser.close();
 
 const result = {
@@ -53,6 +74,17 @@ const result = {
   teamSlots,
   selectedTeamHasMareep: selectedTeam.includes("Mareep"),
   locationVisible,
+  legendaryVisible,
+  legendaryCards,
+  legendaryInitiallyOpen,
+  legendaryFilterSprites,
+  filteredLegendaryCards,
+  filteredLegendaryOpen,
+  legendaryDetailsVisible,
+  legendaryCaught,
+  legendaryStayedOpen,
+  legendaryCollapsed,
+  legendaryExpanded,
   errors,
 };
 
@@ -67,6 +99,17 @@ if (
   teamSlots !== 6 ||
   !result.selectedTeamHasMareep ||
   locationVisible !== 1 ||
+  legendaryVisible !== 1 ||
+  legendaryCards !== 17 ||
+  legendaryInitiallyOpen !== 0 ||
+  legendaryFilterSprites !== 18 ||
+  filteredLegendaryCards !== 1 ||
+  filteredLegendaryOpen !== 1 ||
+  !legendaryDetailsVisible ||
+  legendaryCaught?.trim() !== "Caught" ||
+  legendaryStayedOpen !== 1 ||
+  legendaryCollapsed !== 0 ||
+  legendaryExpanded !== 17 ||
   errors.length
 ) {
   process.exit(1);

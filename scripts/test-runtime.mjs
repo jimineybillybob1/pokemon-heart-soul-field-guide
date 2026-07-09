@@ -18,7 +18,7 @@ class FakeElement {
   constructor(selector = "") {
     this.selector = selector;
     this.dataset = {};
-    this.style = {};
+    this.style = { setProperty() {} };
     this.classList = new FakeClassList();
     this.children = [];
     this.hidden = false;
@@ -45,6 +45,13 @@ class FakeElement {
   closest() {
     return null;
   }
+  append(...children) {
+    this.children.push(...children);
+  }
+  remove() {}
+  getBoundingClientRect() {
+    return { left: 0, top: 0, width: 40, height: 40 };
+  }
 }
 
 function runApp(savedState = null, options = {}) {
@@ -57,7 +64,7 @@ function runApp(savedState = null, options = {}) {
 
   const tabElements = Array.from({ length: 10 }, (_, index) => {
     const element = new FakeElement(".tab");
-    element.dataset.view = ["dex", "locations", "items", "moves", "trainers", "team", "planner", "battle", "more", "save"][index];
+    element.dataset.view = ["dex", "locations", "legendaries", "items", "moves", "trainers", "team", "planner", "battle", "save"][index];
     return element;
   });
   const viewElements = tabElements.map((tab) => {
@@ -74,6 +81,9 @@ function runApp(savedState = null, options = {}) {
     },
     querySelector(selector) {
       return elementFor(selector);
+    },
+    createElement(tagName) {
+      return new FakeElement(tagName);
     },
     querySelectorAll(selector) {
       if (selector === "[data-view]") return tabElements;
@@ -97,7 +107,9 @@ function runApp(savedState = null, options = {}) {
     window: {},
     document,
     localStorage,
+    location: { hash: "" },
     history: { replaceState() {} },
+    scrollTo() {},
     confirm: () => true,
     alert(message) {
       throw new Error(message);
@@ -133,6 +145,7 @@ function runApp(savedState = null, options = {}) {
     elementFor,
     click(selector) {
       listeners.click?.({
+        preventDefault() {},
         target: {
           closest(query) {
             return query
@@ -169,6 +182,14 @@ const bossState = {
   battleTargets: ["", ""],
 };
 const bossApp = runApp(bossState);
+function renderViews(app, viewIds) {
+  viewIds.forEach((viewId) => {
+    app.elementFor("[data-view]").dataset.view = viewId;
+    app.click("[data-view]");
+  });
+}
+renderViews(defaultApp, ["locations", "items", "moves", "trainers", "team", "planner", "battle", "save", "dex"]);
+renderViews(bossApp, ["team", "battle"]);
 const speciesModalApp = runApp();
 speciesModalApp.elementFor("[data-open-species]").dataset.openSpecies = "Bulbasaur";
 speciesModalApp.click("[data-open-species]");
@@ -180,6 +201,9 @@ await new Promise((resolve) => setTimeout(resolve, 100));
 const badgeApp = runApp();
 badgeApp.elementFor("[data-badge]").dataset.badge = "zephyr";
 badgeApp.click("[data-badge]");
+const legendaryApp = runApp();
+legendaryApp.elementFor("[data-view]").dataset.view = "legendaries";
+legendaryApp.click("[data-view]");
 
 const checks = {
   dashboardRendered:
@@ -196,7 +220,7 @@ const checks = {
   dexSortControlRendered: defaultApp.elementFor("#dex-controls").innerHTML.includes("id=\"dex-sort\"") && defaultApp.elementFor("#dex-controls").innerHTML.includes("Sp. Atk"),
   dexCardsHaveMovesButton: defaultApp.elementFor("#dex-grid").innerHTML.includes("data-open-moves"),
   dexCardsHaveAbilityButtons: defaultApp.elementFor("#dex-grid").innerHTML.includes("ability-button") && defaultApp.elementFor("#dex-grid").innerHTML.includes("Powers up Grass moves"),
-  dexCardsDoNotUseDetailsPane: !defaultApp.elementFor("#dex-grid").innerHTML.includes("<details"),
+  dexCardsDoNotUseDetailsPane: !defaultApp.elementFor("#dex-grid").innerHTML.includes('class="pokemon-card-details"'),
   dexCardsDoNotUseProfileBlocks: !defaultApp.elementFor("#dex-grid").innerHTML.includes("Profile"),
   dexCardsHideNoneAbilities: !defaultApp.elementFor("#dex-grid").innerHTML.includes(">None</span>"),
   locationsHaveClickableSpriteEncounters:
@@ -206,6 +230,19 @@ const checks = {
   locationsGroupedByTime:
     defaultApp.elementFor("#location-list").innerHTML.includes("location-time-section") &&
     defaultApp.elementFor("#location-list").innerHTML.includes("location-method"),
+  legendaryTabRendered:
+    indexHtml.includes('data-view="legendaries"') &&
+    indexHtml.includes("assets/items/s_s_ticket.png") &&
+    legendaryApp.elementFor("#legendary-controls").innerHTML.includes('data-legendary-filter="ho-oh"') &&
+    legendaryApp.elementFor("#legendary-controls").innerHTML.includes("assets/pokemon/mewtwo.png"),
+  legendaryGuidesRendered:
+    (legendaryApp.elementFor("#legendary-list").innerHTML.match(/data-legendary-section=/g) || []).length === 17 &&
+    legendaryApp.elementFor("#legendary-list").innerHTML.includes("Old Sea Map") &&
+    legendaryApp.elementFor("#legendary-list").innerHTML.includes("Move left 4, face down, and press A.") &&
+    legendaryApp.elementFor("#legendary-list").innerHTML.includes("Base stats") &&
+    legendaryApp.elementFor("#legendary-list").innerHTML.includes('data-caught="Ho Oh"') &&
+    legendaryApp.elementFor("#legendary-list").innerHTML.includes('data-open-moves="Mewtwo"') &&
+    !legendaryApp.elementFor("#legendary-list").innerHTML.includes('data-legendary-section="ho-oh" open'),
   speciesModalRendered:
     speciesModalApp.elementFor("#modal-root").innerHTML.includes("data-species-modal=\"Bulbasaur\"") &&
     speciesModalApp.elementFor("#modal-root").innerHTML.includes("Mark caught") &&
@@ -321,6 +358,8 @@ if (
   !checks.dexCardsHideNoneAbilities ||
   !checks.locationsHaveClickableSpriteEncounters ||
   !checks.locationsGroupedByTime ||
+  !checks.legendaryTabRendered ||
+  !checks.legendaryGuidesRendered ||
   !checks.speciesModalRendered ||
   !checks.itemIconsRendered ||
   !checks.itemDescriptionsRendered ||

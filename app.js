@@ -16,7 +16,7 @@
   const defaultSyncEndpoint = "https://heart-soul-field-guide-sync.james-stewart1992.workers.dev";
   const syncEndpoint = (window.HEART_SOUL_SYNC_ENDPOINT || defaultSyncEndpoint).replace(/\/+$/, "");
   const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  const appShellVersion = "heart-soul-field-guide-v25";
+  const appShellVersion = "heart-soul-field-guide-v28";
   const species = [...data.species].sort((a, b) => Number(a.dex || 0) - Number(b.dex || 0));
   const speciesByName = new Map(species.map((entry) => [entry.name, entry]));
   const speciesByLookup = new Map(species.map((entry) => [normalize(entry.name), entry]));
@@ -86,6 +86,319 @@
   ];
   const badgeDefinitions = badgeGroups.flatMap((group) => group.badges);
   const badgeIds = new Set(badgeDefinitions.map((badge) => badge.id));
+  const legendaryGuides = [
+    {
+      id: "ho-oh",
+      name: "Ho-Oh",
+      entryName: "Ho Oh",
+      sprite: "ho-oh",
+      group: "Johto",
+      availability: "Story encounter with Gold choice; Kanto encounter with Silver choice",
+      timestamp: "0:08",
+      videoTime: 8,
+      requirement: "Your Gold or Silver choice during Baoba's Route 39 event determines whether Ho-Oh or Lugia is summoned during the story.",
+      steps: [
+        "If you selected Gold, finish the Goldenrod Radio Tower storyline and receive the Rainbow Wing.",
+        "Earn all eight Johto badges, then visit the Ecruteak Dance Theatre.",
+        "Defeat all five Kimono Girls consecutively and receive the Clear Bell.",
+        "Enter Bellchime Trail in northeast Ecruteak, enter Tin Tower, and climb to the roof.",
+        "Approach the Kimono Girls to summon Ho-Oh, save, and interact with it.",
+        "If you selected Silver, obtain the Rainbow Wing from the old man in Pewter City during Kanto, then climb Tin Tower for the later encounter.",
+      ],
+    },
+    {
+      id: "suicune",
+      name: "Suicune",
+      sprite: "suicune",
+      group: "Johto and Kanto",
+      availability: "Chase encounter",
+      timestamp: "4:22",
+      videoTime: 262,
+      requirement: "Release the legendary beasts from Burned Tower B1F before beginning the chase.",
+      steps: [
+        "Enter Burned Tower in Ecruteak and drop into B1F.",
+        "Approach the three beasts to release them.",
+        "Encounter Suicune north of Cianwood City.",
+        "Find it outside Mt. Mortar on Route 42.",
+        "Find it beside Vermilion Port.",
+        "Find it on Route 14.",
+        "Restore the Power Plant and defeat Misty.",
+        "Travel north across Nugget Bridge to Route 25 and continue toward Bill's Cottage.",
+        "Speak to Eusine, then save and interact with Suicune.",
+      ],
+    },
+    {
+      id: "entei",
+      name: "Entei",
+      sprite: "entei",
+      group: "Johto",
+      availability: "First roaming beast",
+      timestamp: "6:01",
+      videoTime: 361,
+      requirement: "Entei becomes the active level 40 roamer after the Burned Tower event.",
+      steps: [
+        "Release the legendary beasts in Burned Tower B1F.",
+        "Check Entei's current route using the Pokédex or Pokégear map.",
+        "Move repeatedly between two connected routes until Entei appears on your route.",
+        "Enter nearby grass and trigger the encounter.",
+        "Use Mean Look, Shadow Tag, or another escape-prevention method.",
+        "Inflict sleep or paralysis and catch Entei. Catching or defeating it activates Raikou.",
+      ],
+      note: "Catch Entei rather than knocking it out if you want both beasts without waiting for a later League reset.",
+    },
+    {
+      id: "raikou",
+      name: "Raikou",
+      sprite: "raikou",
+      group: "Johto",
+      availability: "Second roaming beast",
+      timestamp: "7:12",
+      videoTime: 432,
+      requirement: "Raikou starts roaming only after Entei has been caught or defeated.",
+      steps: [
+        "Catch or defeat Entei to activate Raikou.",
+        "Check Raikou's current route using the Pokédex or Pokégear map.",
+        "Move between connected routes until its location matches yours.",
+        "Search the grass to encounter it.",
+        "Prevent escape, inflict status, and catch Raikou.",
+      ],
+    },
+    {
+      id: "lugia",
+      name: "Lugia",
+      sprite: "lugia",
+      group: "Johto",
+      availability: "Story encounter with Silver choice; Kanto encounter with Gold choice",
+      timestamp: "7:45",
+      videoTime: 465,
+      requirement: "Silver players receive the story items from the Radio Tower and Kimono Girls. Gold players receive the Silver Wing from the old man in Pewter City.",
+      steps: [
+        "Surf to Route 41 between Olivine and Cianwood.",
+        "Use Whirlpool and enter the northeastern Whirl Islands entrance.",
+        "Use Flash if needed, follow the upper path, and descend into B1F.",
+        "Continue through B1F Inner, B2F, and B3F.",
+        "Enter Whirl Islands Descent and follow the long downward route.",
+        "Enter Lugia's chamber, save, and interact with it.",
+      ],
+    },
+    {
+      id: "celebi",
+      name: "Celebi",
+      sprite: "celebi",
+      group: "Johto",
+      availability: "GS Ball event",
+      timestamp: "9:13",
+      videoTime: 553,
+      requirement: "Clear the Pokémon League a second time so the GS Ball appears in the Ruins of Alph.",
+      steps: [
+        "Enter the Ruins of Alph main underground chamber, B1F.",
+        "Collect the GS Ball in the northwest portion of the chamber.",
+        "Take the GS Ball to Kurt in Azalea Town and let him examine it.",
+        "Exit Kurt's house; he follows and returns the activated GS Ball.",
+        "Enter Ilex Forest and interact with the shrine.",
+        "Insert the GS Ball, then save and catch Celebi.",
+      ],
+    },
+    {
+      id: "zapdos",
+      name: "Zapdos",
+      sprite: "zapdos",
+      group: "Kanto",
+      availability: "Stationary encounter",
+      timestamp: "11:03",
+      videoTime: 663,
+      requirement: "Reach Kanto after the first Pokémon League clear.",
+      steps: [
+        "Travel through Route 9 to Route 10.",
+        "Surf south to the Power Plant.",
+        "Find Zapdos standing outside the Power Plant.",
+        "Save and interact with it.",
+      ],
+    },
+    {
+      id: "articuno",
+      name: "Articuno",
+      sprite: "articuno",
+      group: "Kanto",
+      availability: "Stationary encounter",
+      timestamp: "11:48",
+      videoTime: 708,
+      requirement: "Reach Kanto after the first Pokémon League clear.",
+      steps: [
+        "Surf to the Seafoam Islands on Route 20.",
+        "Enter a Seafoam cave entrance.",
+        "Navigate through 1F and descend to B1F.",
+        "Cross the icy lower chamber.",
+        "Find Articuno on its platform, save, and interact with it.",
+      ],
+    },
+    {
+      id: "moltres",
+      name: "Moltres",
+      sprite: "moltres",
+      group: "Kanto",
+      availability: "Mt. Silver encounter",
+      timestamp: "12:37",
+      videoTime: 757,
+      requirement: "Obtain all sixteen badges so Professor Oak opens the route to Mt. Silver.",
+      steps: [
+        "Travel through Route 28 and enter Mt. Silver.",
+        "From the entrance, enter the large Waterfall Room.",
+        "Surf across the water and climb the western or northern waterfall.",
+        "Enter the northern doorway leading to the Moltres Room.",
+        "Follow the chamber to Moltres, save, and interact with it.",
+      ],
+    },
+    {
+      id: "groudon",
+      name: "Groudon",
+      sprite: "groudon",
+      group: "Kanto",
+      availability: "Seafoam Secret Cave",
+      timestamp: "13:30",
+      videoTime: 810,
+      requirement: "Begin the Kanto portion after the first Pokémon League clear. Heart & Soul does not require an orb.",
+      steps: [
+        "Travel to the Seafoam Islands.",
+        "Enter the Seafoam Gym.",
+        "Work through the gym to its northern rear doorway.",
+        "Enter the Secret Cave behind the gym.",
+        "Approach Groudon, save, and interact with it.",
+      ],
+    },
+    {
+      id: "kyogre",
+      name: "Kyogre",
+      sprite: "kyogre",
+      group: "Kanto",
+      availability: "Route 19 Cave",
+      timestamp: "14:12",
+      videoTime: 852,
+      requirement: "Begin the Kanto portion after the first Pokémon League clear. Heart & Soul does not require an orb.",
+      steps: [
+        "Fly to Fuchsia City.",
+        "Travel south onto Route 19.",
+        "Continue down the route until you find the cave entrance.",
+        "Enter Route 19 Cave.",
+        "Follow the short cavern to Kyogre, save, and interact with it.",
+      ],
+    },
+    {
+      id: "rayquaza",
+      name: "Rayquaza",
+      sprite: "rayquaza",
+      group: "Johto",
+      availability: "Embedded Tower",
+      timestamp: "14:47",
+      videoTime: 887,
+      requirement: "Begin the Kanto portion after the first Pokémon League clear. Groudon, Kyogre, and a Jade Orb are not required.",
+      steps: [
+        "Travel to Route 47, west of Cianwood.",
+        "Work down toward the lower coastline using Surf and the cliff paths.",
+        "Locate the cave entrance in the western cliff.",
+        "Enter Embedded Tower and follow the chamber north.",
+        "Save and interact with Rayquaza.",
+      ],
+    },
+    {
+      id: "mew",
+      name: "Mew",
+      sprite: "mew",
+      group: "Event island",
+      availability: "Old Sea Map",
+      timestamp: "15:53",
+      videoTime: 953,
+      requirement: "Complete the Power Plant Machine Part quest so Vermilion Port offers special destinations.",
+      steps: [
+        "Collect the Old Sea Map item ball on Vermilion City's far southeastern shoreline.",
+        "Enter Vermilion Port and speak to the sailor.",
+        "Select Faraway Island.",
+        "Enter the island's interior grass maze.",
+        "Chase Mew's moving shadow until you can approach it.",
+        "Corner Mew, save, and interact with it.",
+      ],
+      note: "Do not use Cut on the grass maze. Doing so makes Mew disappear from the area.",
+    },
+    {
+      id: "deoxys",
+      name: "Deoxys",
+      sprite: "deoxys",
+      group: "Event island",
+      availability: "Aurora Ticket",
+      timestamp: "17:23",
+      videoTime: 1043,
+      requirement: "Clear the Pokémon League a second time and restore the Power Plant.",
+      steps: [
+        "In southern Olivine City, speak to the attendant near the waterfront and receive the Aurora Ticket.",
+        "Travel to Vermilion Port and select Birth Island.",
+        "Stand immediately below the central triangle and press A.",
+        "Move left 4, face down, and press A.",
+        "Move right 4 and up 4, face up, and press A.",
+        "Move right 4 and down 4, face down, and press A.",
+        "Move left 6 and up 2, face left, and press A.",
+        "Move right 4, face right, and press A.",
+        "Move left 2 and down 2, face down, and press A.",
+        "Move left 3 and down 1, face left, and press A.",
+        "Move right 6, face right, and press A.",
+        "Move left 3, face down, and press A.",
+        "Move up 3, face up, and press A to reveal Deoxys.",
+      ],
+      note: "The puzzle resets if you take unnecessary steps or bump into obstacles.",
+    },
+    {
+      id: "latias",
+      name: "Latias",
+      sprite: "latias",
+      group: "Event island",
+      availability: "Eon Ticket",
+      timestamp: "18:26",
+      videoTime: 1106,
+      requirement: "Clear the Pokémon League a second time and restore the Power Plant.",
+      steps: [
+        "Visit the Safari Zone entrance in Fuchsia City.",
+        "Speak to Steven and receive the Eon Ticket.",
+        "Travel to Vermilion Port and select Southern Island.",
+        "Enter the grove at the centre of the island.",
+        "Find Latias inside the grove, save, and interact with it.",
+      ],
+    },
+    {
+      id: "latios",
+      name: "Latios",
+      sprite: "latios",
+      group: "Event island",
+      availability: "Eon Ticket",
+      timestamp: "18:26",
+      videoTime: 1106,
+      requirement: "Clear the Pokémon League a second time and restore the Power Plant.",
+      steps: [
+        "Visit the Safari Zone entrance in Fuchsia City.",
+        "Speak to Steven and receive the Eon Ticket.",
+        "Travel to Vermilion Port and select Southern Island.",
+        "Enter the grove at the centre of the island.",
+        "Find Latios inside the grove, save, and interact with it.",
+      ],
+    },
+    {
+      id: "mewtwo",
+      name: "Mewtwo",
+      sprite: "mewtwo",
+      group: "Kanto",
+      availability: "Cerulean Cave",
+      timestamp: "20:20",
+      videoTime: 1220,
+      requirement: "Clear the first Pokémon League and begin the Kanto portion.",
+      steps: [
+        "Travel to northwest Cerulean City.",
+        "Surf across the water to Cerulean Cave.",
+        "Enter the cave and navigate through 1F.",
+        "Use the ladders between B1F and 1F to reach the western basement route.",
+        "Descend into B2F, the deepest chamber.",
+        "Follow the path to Mewtwo and save before interacting with it.",
+      ],
+      note: "Mewtwo is one of the guide's highest-level stationary encounters.",
+    },
+  ];
   const typeNames = [
     "Normal",
     "Fire",
@@ -270,7 +583,7 @@
   const dexBatchSize = 50;
   let dexVisibleCount = dexBatchSize;
   let dexFilteredCount = species.length;
-  const viewIds = ["dex", "locations", "items", "moves", "trainers", "team", "planner", "battle", "save"];
+  const viewIds = ["dex", "locations", "legendaries", "items", "moves", "trainers", "team", "planner", "battle", "save"];
   let currentViewId = initialViewId();
   const renderedViews = new Set();
   const dirtyViews = new Set(viewIds);
@@ -280,6 +593,8 @@
   let syncStatus = "unchecked";
   let cloudHistory = [];
   const expandedLocations = new Set();
+  const expandedLegendaries = new Set();
+  let legendaryFilter = "";
   const deviceId = loadDeviceId();
 
   const state = loadState();
@@ -312,6 +627,9 @@
     locationControls: document.querySelector("#location-controls"),
     locationList: document.querySelector("#location-list"),
     locationCount: document.querySelector("#location-count"),
+    legendaryControls: document.querySelector("#legendary-controls"),
+    legendaryList: document.querySelector("#legendary-list"),
+    legendaryCount: document.querySelector("#legendary-count"),
     itemControls: document.querySelector("#item-controls"),
     itemTable: document.querySelector("#item-table"),
     itemCount: document.querySelector("#item-count"),
@@ -404,6 +722,7 @@
 
       const caughtButton = event.target.closest("[data-caught]");
       if (caughtButton) {
+        event.preventDefault();
         const name = caughtButton.dataset.caught;
         const modalSpecies = caughtButton.closest("[data-species-modal]")?.dataset.speciesModal;
         const wasCaught = Boolean(state.caught[name]);
@@ -411,7 +730,7 @@
         state.caught[name] = !wasCaught;
         persist();
         renderDashboard();
-        invalidateViews(["dex", "locations", "save"]);
+        invalidateViews(["dex", "locations", "legendaries", "save"]);
         if (modalSpecies) openSpeciesModal(name);
         if (!wasCaught) celebrate(origin, "🎉");
         return;
@@ -483,6 +802,21 @@
       const locationJump = event.target.closest("[data-jump-location]");
       if (locationJump) {
         jumpToLocation(locationJump.dataset.jumpLocation);
+        return;
+      }
+
+      const legendarySectionButton = event.target.closest("[data-legendary-sections]");
+      if (legendarySectionButton) {
+        setLegendarySectionsOpen(legendarySectionButton.dataset.legendarySections === "expand");
+        return;
+      }
+
+      const legendaryFilterButton = event.target.closest("[data-legendary-filter]");
+      if (legendaryFilterButton) {
+        legendaryFilter = legendaryFilterButton.dataset.legendaryFilter || "";
+        if (legendaryFilter) expandedLegendaries.add(legendaryFilter);
+        renderLegendaryControls();
+        renderLegendaries();
         return;
       }
 
@@ -644,11 +978,18 @@
       "toggle",
       (event) => {
         const details = event.target;
-        if (!(details instanceof HTMLDetailsElement) || !details.matches("[data-location-card]")) return;
-        const name = details.dataset.locationCard;
-        if (!name) return;
-        if (details.open) expandedLocations.add(name);
-        else expandedLocations.delete(name);
+        if (!(details instanceof HTMLDetailsElement)) return;
+        if (details.matches("[data-location-card]")) {
+          const name = details.dataset.locationCard;
+          if (!name) return;
+          if (details.open) expandedLocations.add(name);
+          else expandedLocations.delete(name);
+        } else if (details.matches("[data-legendary-section]")) {
+          const id = details.dataset.legendarySection;
+          if (!id) return;
+          if (details.open) expandedLegendaries.add(id);
+          else expandedLegendaries.delete(id);
+        }
       },
       true,
     );
@@ -857,6 +1198,7 @@
         ${data.locations.map((location) => renderLocationFilterButton(location)).join("")}
       </div>
     `;
+    renderLegendaryControls();
     els.itemControls.innerHTML = `
       <label class="field grow"><span>Search</span>${clearableSearchInput({ id: "item-search", value: filters.itemSearch, placeholder: "Item, move, location, held species" })}</label>
       <label class="field"><span>Type</span><select id="item-type">${option("", "Any type")}${itemTypes.map((type) => option(type, type)).join("")}</select></label>
@@ -882,6 +1224,33 @@
     return `
       <button class="location-filter-button ${selected ? "is-active" : ""}" type="button" data-location-filter="${attr(location.name)}">
         ${text(location.name)}
+      </button>
+    `;
+  }
+
+  function renderLegendaryControls() {
+    if (!els.legendaryControls) return;
+    els.legendaryControls.innerHTML = `
+      <div class="toolbar-actions legendary-toolbar-actions">
+        <button class="small-button" type="button" data-legendary-sections="expand">Expand all</button>
+        <button class="small-button" type="button" data-legendary-sections="collapse">Collapse all</button>
+      </div>
+      <div class="legendary-quick-filters" aria-label="Quick legendary filters">
+        <button class="legendary-filter-button legendary-filter-all ${legendaryFilter ? "" : "is-active"}" type="button" data-legendary-filter="" aria-pressed="${!legendaryFilter}">
+          <img src="assets/items/s_s_ticket.png" alt="" />
+          <span>All</span>
+        </button>
+        ${legendaryGuides.map(renderLegendaryFilterButton).join("")}
+      </div>
+    `;
+  }
+
+  function renderLegendaryFilterButton(guide) {
+    const selected = legendaryFilter === guide.id;
+    return `
+      <button class="legendary-filter-button ${selected ? "is-active" : ""}" type="button" data-legendary-filter="${attr(guide.id)}" aria-pressed="${selected}">
+        <img src="${attr(legendarySpritePath(guide))}" alt="" loading="lazy" onerror="this.hidden=true" />
+        <span>${text(guide.name)}</span>
       </button>
     `;
   }
@@ -1441,6 +1810,115 @@
         ${caught ? '<em>Caught</em>' : ""}
       </button>
     `;
+  }
+
+  function filteredLegendaryGuides() {
+    return legendaryFilter ? legendaryGuides.filter((guide) => guide.id === legendaryFilter) : legendaryGuides;
+  }
+
+  function renderLegendaries() {
+    if (!els.legendaryList || !els.legendaryCount) return;
+    const guides = filteredLegendaryGuides();
+    els.legendaryCount.textContent = legendaryFilter
+      ? `Showing ${guides.length} of ${legendaryGuides.length}`
+      : `${legendaryGuides.length} encounters`;
+    els.legendaryList.innerHTML = guides.map(renderLegendaryCard).join("");
+  }
+
+  function renderLegendaryCard(guide) {
+    const entry = speciesByName.get(guide.entryName || guide.name);
+    const isOpen = expandedLegendaries.has(guide.id);
+    const caughtName = entry?.name || guide.name;
+    const caught = Boolean(state.caught[caughtName]);
+    return `
+      <details class="legendary-card ${entry ? "type-backed" : ""} ${caught ? "is-caught" : ""}" data-legendary-section="${attr(guide.id)}" ${isOpen ? "open" : ""}${typeBackdropStyle(entry)}>
+        <summary class="legendary-card-summary">
+          <span class="legendary-card-sprite">
+            <img src="${attr(legendarySpritePath(guide))}" alt="" loading="lazy" onerror="this.hidden=true" />
+          </span>
+          <span class="legendary-card-title">
+            <small>${text(guide.group)}</small>
+            <strong>${text(guide.name)}</strong>
+            <span>${text(guide.availability)}</span>
+          </span>
+          <button class="small-button caught-toggle legendary-caught-toggle ${caught ? "is-caught" : ""}" type="button" data-caught="${attr(caughtName)}" aria-label="${attr(caught ? `Mark ${guide.name} as not caught` : `Mark ${guide.name} as caught`)}">
+            ${caught ? "Caught" : "Mark caught"}
+          </button>
+          <span class="legendary-card-time">${text(guide.timestamp)}</span>
+        </summary>
+        <div class="legendary-card-body">
+          ${renderLegendaryPokemonDetails(entry)}
+          <div class="legendary-requirement">
+            <strong>Before you start</strong>
+            <p>${text(guide.requirement)}</p>
+          </div>
+          <h3>Step-by-step</h3>
+          <ol>
+            ${guide.steps.map((step) => `<li>${text(step)}</li>`).join("")}
+          </ol>
+          ${
+            guide.note
+              ? `<aside class="legendary-note"><strong>Important</strong><p>${text(guide.note)}</p></aside>`
+              : ""
+          }
+          <a class="legendary-video-link" href="https://www.youtube.com/watch?v=euNG-AKpUZA&t=${value(guide.videoTime)}s" target="_blank" rel="noreferrer">
+            Watch this encounter from ${text(guide.timestamp)}
+          </a>
+        </div>
+      </details>
+    `;
+  }
+
+  function renderLegendaryPokemonDetails(entry) {
+    if (!entry) return "";
+    const abilities = displayAbilities(entry);
+    return `
+      <section class="legendary-pokemon-details" aria-label="${attr(`${entry.name} Pokemon details`)}">
+        <header class="legendary-profile-head">
+          <div class="pokemon-metrics">
+            <span class="metric-badge"><small>Dex</small><strong>#${paddedDex(entry.dex)}</strong></span>
+            <span class="metric-badge"><small>BST</small><strong>${value(entry.bst)}</strong></span>
+          </div>
+          <div class="type-row">${entry.types.map(typePill).join("")}</div>
+        </header>
+        <div class="legendary-profile-grid">
+          <section class="legendary-profile-panel legendary-profile-stats">
+            <h3>Base stats</h3>
+            <div class="stat-bars">${statBars(entry.stats)}</div>
+          </section>
+          <section class="legendary-profile-panel">
+            <h3>Abilities</h3>
+            <div class="chip-row ability-row">${abilities.length ? abilities.map(renderAbilityButton).join("") : '<span class="chip">No ability listed</span>'}</div>
+          </section>
+          <section class="legendary-profile-panel">
+            <h3>Evolution</h3>
+            ${renderEvolutionLinks(entry)}
+          </section>
+          <section class="legendary-profile-panel">
+            <h3>Dex locations</h3>
+            ${renderAvailability(entry)}
+          </section>
+        </div>
+        <div class="legendary-profile-actions">
+          <button class="chip-button primary-chip" type="button" data-jump-species="${attr(entry.name)}">Open in Full Dex</button>
+          <button class="chip-button" type="button" data-open-moves="${attr(entry.name)}">View moves</button>
+          <button class="chip-button" type="button" data-add-team="${attr(entry.name)}">Add to team</button>
+          <button class="chip-button" type="button" data-add-planner="${attr(entry.name)}">Plan</button>
+        </div>
+      </section>
+    `;
+  }
+
+  function legendarySpritePath(guide) {
+    return `assets/pokemon/${guide.sprite}.png`;
+  }
+
+  function setLegendarySectionsOpen(expand) {
+    filteredLegendaryGuides().forEach((guide) => {
+      if (expand) expandedLegendaries.add(guide.id);
+      else expandedLegendaries.delete(guide.id);
+    });
+    renderLegendaries();
   }
 
   function renderItems() {
@@ -2695,6 +3173,7 @@
 
     if (viewId === "dex") renderDex();
     else if (viewId === "locations") renderLocations();
+    else if (viewId === "legendaries") renderLegendaries();
     else if (viewId === "items") renderItems();
     else if (viewId === "moves") renderMoves();
     else if (viewId === "trainers") renderTrainers();
