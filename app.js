@@ -10,13 +10,14 @@
   const saveFormat = "heart-soul-field-guide-save";
   const saveVersion = 1;
   const maxLocalBackups = 5;
+  const maxSavedTeams = 12;
   const syncCodeKey = "heart-soul-field-guide-sync-code";
   const syncContextKey = "heart-soul-field-guide-sync-context-v1";
   const syncDeviceKey = "heart-soul-field-guide-sync-device-v1";
   const defaultSyncEndpoint = "https://heart-soul-field-guide-sync.james-stewart1992.workers.dev";
   const syncEndpoint = (window.HEART_SOUL_SYNC_ENDPOINT || defaultSyncEndpoint).replace(/\/+$/, "");
   const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  const appShellVersion = "heart-soul-field-guide-v28";
+  const appShellVersion = "heart-soul-field-guide-v29";
   const species = [...data.species].sort((a, b) => Number(a.dex || 0) - Number(b.dex || 0));
   const speciesByName = new Map(species.map((entry) => [entry.name, entry]));
   const speciesByLookup = new Map(species.map((entry) => [normalize(entry.name), entry]));
@@ -607,6 +608,7 @@
     locationSearch: "",
     locationExact: "",
     locationHideCaught: false,
+    legendaryHideCaught: false,
     itemSearch: "",
     itemType: "",
     moveSearch: "",
@@ -730,6 +732,7 @@
         state.caught[name] = !wasCaught;
         persist();
         renderDashboard();
+        renderLegendaryControls();
         invalidateViews(["dex", "locations", "legendaries", "save"]);
         if (modalSpecies) openSpeciesModal(name);
         if (!wasCaught) celebrate(origin, "🎉");
@@ -811,6 +814,14 @@
         return;
       }
 
+      const legendaryHideCaughtButton = event.target.closest("[data-legendary-hide-caught]");
+      if (legendaryHideCaughtButton) {
+        filters.legendaryHideCaught = !filters.legendaryHideCaught;
+        renderLegendaryControls();
+        renderLegendaries();
+        return;
+      }
+
       const legendaryFilterButton = event.target.closest("[data-legendary-filter]");
       if (legendaryFilterButton) {
         legendaryFilter = legendaryFilterButton.dataset.legendaryFilter || "";
@@ -852,6 +863,23 @@
       if (clearTeam) {
         state.team[Number(clearTeam.dataset.clearTeam)] = blankTeamSlot();
         persistAndRenderTeam();
+        return;
+      }
+
+      if (event.target.closest("#save-current-team")) {
+        saveCurrentTeam();
+        return;
+      }
+
+      const loadSavedTeamButton = event.target.closest("[data-load-saved-team]");
+      if (loadSavedTeamButton) {
+        loadSavedTeam(loadSavedTeamButton.dataset.loadSavedTeam);
+        return;
+      }
+
+      const deleteSavedTeamButton = event.target.closest("[data-delete-saved-team]");
+      if (deleteSavedTeamButton) {
+        deleteSavedTeam(deleteSavedTeamButton.dataset.deleteSavedTeam);
         return;
       }
 
@@ -948,7 +976,7 @@
       }
 
       if (event.target.closest("#reset-save")) {
-        if (confirm("Reset caught Pokemon, team, planner, battle settings, and rules?")) {
+        if (confirm("Reset caught Pokemon, team, saved teams, planner, battle settings, and rules?")) {
           saveLocalBackup("Before reset");
           const fresh = defaultState();
           Object.assign(state, fresh);
@@ -1194,8 +1222,8 @@
         <button class="small-button" type="button" data-location-sections="collapse">Collapse all</button>
       </div>
       <div class="location-quick-filters" aria-label="Quick location filters">
-        <button class="location-filter-button ${filters.locationSearch ? "" : "is-active"}" type="button" data-location-filter="">All locations</button>
-        ${data.locations.map((location) => renderLocationFilterButton(location)).join("")}
+        <button class="location-filter-button ${filters.locationSearch ? "" : "is-active"}" type="button" data-location-filter="">All Locations</button>
+        ${sortedLocationQuickFilters().map((location) => renderLocationFilterButton(location)).join("")}
       </div>
     `;
     renderLegendaryControls();
@@ -1228,10 +1256,31 @@
     `;
   }
 
+  function sortedLocationQuickFilters() {
+    return [...data.locations].sort(compareLocationQuickFilters);
+  }
+
+  function compareLocationQuickFilters(a, b) {
+    const aRoute = locationRouteNumber(a.name);
+    const bRoute = locationRouteNumber(b.name);
+    if (aRoute !== null && bRoute !== null) {
+      return aRoute - bRoute || a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" });
+    }
+    if (aRoute !== null) return -1;
+    if (bRoute !== null) return 1;
+    return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" });
+  }
+
+  function locationRouteNumber(name) {
+    const match = String(name || "").match(/^Route\s+(\d+)\b/i);
+    return match ? Number(match[1]) : null;
+  }
+
   function renderLegendaryControls() {
     if (!els.legendaryControls) return;
     els.legendaryControls.innerHTML = `
       <div class="toolbar-actions legendary-toolbar-actions">
+        <button class="small-button toggle-button ${filters.legendaryHideCaught ? "is-active" : ""}" type="button" data-legendary-hide-caught aria-pressed="${filters.legendaryHideCaught ? "true" : "false"}">${filters.legendaryHideCaught ? "Showing uncaught" : "Hide caught"}</button>
         <button class="small-button" type="button" data-legendary-sections="expand">Expand all</button>
         <button class="small-button" type="button" data-legendary-sections="collapse">Collapse all</button>
       </div>
@@ -1247,12 +1296,23 @@
 
   function renderLegendaryFilterButton(guide) {
     const selected = legendaryFilter === guide.id;
+    const caught = legendaryIsCaught(guide);
     return `
-      <button class="legendary-filter-button ${selected ? "is-active" : ""}" type="button" data-legendary-filter="${attr(guide.id)}" aria-pressed="${selected}">
+      <button class="legendary-filter-button ${selected ? "is-active" : ""} ${caught ? "is-caught" : ""}" type="button" data-legendary-filter="${attr(guide.id)}" aria-pressed="${selected}">
         <img src="${attr(legendarySpritePath(guide))}" alt="" loading="lazy" onerror="this.hidden=true" />
+        ${caught ? '<em class="legendary-filter-caught-badge">Caught</em>' : ""}
         <span>${text(guide.name)}</span>
       </button>
     `;
+  }
+
+  function legendaryCaughtName(guide) {
+    const entry = speciesByName.get(guide.entryName || guide.name);
+    return entry?.name || guide.name;
+  }
+
+  function legendaryIsCaught(guide) {
+    return Boolean(state.caught[legendaryCaughtName(guide)]);
   }
 
   function clearableSearchInput({ id = "", value = "", placeholder = "", type = "search", attributes = "" } = {}) {
@@ -1813,22 +1873,26 @@
   }
 
   function filteredLegendaryGuides() {
-    return legendaryFilter ? legendaryGuides.filter((guide) => guide.id === legendaryFilter) : legendaryGuides;
+    return legendaryGuides.filter((guide) => {
+      if (legendaryFilter && guide.id !== legendaryFilter) return false;
+      if (filters.legendaryHideCaught && legendaryIsCaught(guide)) return false;
+      return true;
+    });
   }
 
   function renderLegendaries() {
     if (!els.legendaryList || !els.legendaryCount) return;
     const guides = filteredLegendaryGuides();
-    els.legendaryCount.textContent = legendaryFilter
+    els.legendaryCount.textContent = legendaryFilter || filters.legendaryHideCaught
       ? `Showing ${guides.length} of ${legendaryGuides.length}`
       : `${legendaryGuides.length} encounters`;
-    els.legendaryList.innerHTML = guides.map(renderLegendaryCard).join("");
+    els.legendaryList.innerHTML = guides.map(renderLegendaryCard).join("") || empty("No legendary Pokemon match those filters.");
   }
 
   function renderLegendaryCard(guide) {
     const entry = speciesByName.get(guide.entryName || guide.name);
     const isOpen = expandedLegendaries.has(guide.id);
-    const caughtName = entry?.name || guide.name;
+    const caughtName = legendaryCaughtName(guide);
     const caught = Boolean(state.caught[caughtName]);
     return `
       <details class="legendary-card ${entry ? "type-backed" : ""} ${caught ? "is-caught" : ""}" data-legendary-section="${attr(guide.id)}" ${isOpen ? "open" : ""}${typeBackdropStyle(entry)}>
@@ -2203,10 +2267,62 @@
   function renderTeam() {
     els.teamGrid.innerHTML = `
       <datalist id="team-item-list">${data.items.map((item) => `<option value="${attr(item.name)}"></option>`).join("")}</datalist>
+      ${renderTeamSaveManager()}
       ${renderTeamOffensiveSummary()}
       ${state.team.map((slot, index) => renderTeamSlot(slot, index)).join("")}
     `;
     renderTeamOverview();
+  }
+
+  function renderTeamSaveManager() {
+    const populatedSlots = state.team.filter((slot) => slot.species).length;
+    const savedTeams = state.savedTeams || [];
+    return `
+      <section class="team-save-manager">
+        <header>
+          <div>
+            <h3>Saved Teams</h3>
+            <p class="muted">Save this Team Builder setup in this browser, then reload it later with moves, item, nature, ability, and nicknames intact.</p>
+          </div>
+          <span class="chip">${savedTeams.length} / ${maxSavedTeams} saved</span>
+        </header>
+        <div class="team-save-controls">
+          <label class="field grow"><span>Team name</span><input id="team-save-name" value="" maxlength="48" placeholder="${attr(defaultTeamSaveName())}" /></label>
+          <button class="button" id="save-current-team" type="button" ${populatedSlots ? "" : "disabled"}>Save current team</button>
+        </div>
+        <p class="save-status team-save-status" id="team-save-status" aria-live="polite"></p>
+        <div class="team-save-list">
+          ${savedTeams.length ? savedTeams.map(renderSavedTeamEntry).join("") : empty("No saved teams yet. Build a team, give it a name if you want, then save it here.")}
+        </div>
+      </section>
+    `;
+  }
+
+  function renderSavedTeamEntry(savedTeam) {
+    const members = savedTeam.team.filter((slot) => slot.species);
+    return `
+      <article class="team-save-entry">
+        <div class="team-save-entry-main">
+          <div>
+            <strong title="${attr(savedTeam.name)}">${text(savedTeam.name)}</strong>
+            <small class="muted">${members.length} Pokemon · Saved ${text(formatDate(savedTeam.savedAt))}</small>
+          </div>
+          <div class="team-save-sprites" aria-label="${attr(`${savedTeam.name} members`)}">
+            ${members
+              .map((slot) => {
+                const entry = speciesByName.get(slot.species);
+                const label = slot.nickname ? `${slot.nickname} (${slot.species})` : slot.species;
+                return `<span title="${attr(label)}">${miniSprite(entry)}</span>`;
+              })
+              .join("")}
+          </div>
+        </div>
+        <div class="team-save-actions">
+          <button class="small-button" type="button" data-load-saved-team="${attr(savedTeam.id)}">Load</button>
+          <button class="small-button" type="button" data-delete-saved-team="${attr(savedTeam.id)}">Delete</button>
+        </div>
+      </article>
+    `;
   }
 
   function renderTeamSlot(slot, index) {
@@ -2267,6 +2383,74 @@
         </div>
       </article>
     `;
+  }
+
+  function saveCurrentTeam() {
+    const team = cloneTeamForStorage(state.team);
+    if (!team.some((slot) => slot.species)) {
+      setTeamSaveStatus("Add at least one Pokemon before saving a team.", "error");
+      return;
+    }
+    const input = document.querySelector("#team-save-name");
+    const requestedName = cleanTeamSaveName(input?.value) || defaultTeamSaveName();
+    const savedTeam = {
+      id: makeId(),
+      name: requestedName,
+      savedAt: new Date().toISOString(),
+      team,
+    };
+    const existingIndex = state.savedTeams.findIndex((entry) => normalize(entry.name) === normalize(requestedName));
+    if (existingIndex >= 0) {
+      if (!confirm(`Replace saved team "${requestedName}"?`)) return;
+      savedTeam.id = state.savedTeams[existingIndex].id || savedTeam.id;
+      state.savedTeams.splice(existingIndex, 1, savedTeam);
+    } else {
+      state.savedTeams = [savedTeam, ...state.savedTeams].slice(0, maxSavedTeams);
+    }
+    persist();
+    renderTeam();
+    invalidateViews(["battle", "save"], { renderCurrent: false });
+    setTeamSaveStatus(`Saved "${requestedName}".`, "success");
+  }
+
+  function loadSavedTeam(id) {
+    const savedTeam = state.savedTeams.find((entry) => entry.id === id);
+    if (!savedTeam) return;
+    const hasCurrentTeam = state.team.some((slot) => slot.species);
+    if (hasCurrentTeam && !confirm(`Replace the current Team Builder team with "${savedTeam.name}"?`)) return;
+    state.team = cloneTeamForStorage(savedTeam.team);
+    persistAndRenderTeam();
+    setTeamSaveStatus(`Loaded "${savedTeam.name}".`, "success");
+  }
+
+  function deleteSavedTeam(id) {
+    const savedTeam = state.savedTeams.find((entry) => entry.id === id);
+    if (!savedTeam) return;
+    if (!confirm(`Delete saved team "${savedTeam.name}" from this browser?`)) return;
+    state.savedTeams = state.savedTeams.filter((entry) => entry.id !== id);
+    persist();
+    renderTeam();
+    invalidateView("save", { renderCurrent: false });
+    setTeamSaveStatus(`Deleted "${savedTeam.name}".`, "success");
+  }
+
+  function cloneTeamForStorage(team) {
+    return sanitizeSlots(team, blankTeamSlot);
+  }
+
+  function defaultTeamSaveName() {
+    const names = state.team
+      .filter((slot) => slot.species)
+      .slice(0, 3)
+      .map((slot) => cleanTeamNickname(slot.nickname) || slot.species);
+    return cleanTeamSaveName(names.length ? names.join(" / ") : `Team ${state.savedTeams.length + 1}`);
+  }
+
+  function setTeamSaveStatus(message, type = "") {
+    const status = document.querySelector("#team-save-status");
+    if (!status) return;
+    status.textContent = message;
+    status.dataset.status = type;
   }
 
   function renderSlotIdentity(entry, slot) {
@@ -3066,6 +3250,7 @@
           <span class="chip">${caughtCount()} caught</span>
           <span class="chip">${obtainedBadgeCount()} badges</span>
           <span class="chip">${state.team.filter((slot) => slot.species).length} team slots</span>
+          <span class="chip">${state.savedTeams.length} saved teams</span>
           <span class="chip">${state.planner.filter((slot) => slot.species).length} planned</span>
           <span class="chip">${state.battleMode === "trainer" ? `Boss: ${text(selectedBattleTrainer()?.name || "trainer")}` : "Custom battle"}</span>
           <span class="chip">Revision ${save.revision}</span>
@@ -3868,6 +4053,7 @@
       rules: next.rules,
       caught: Object.keys(next.caught).filter((name) => next.caught[name]).sort(),
       team: next.team,
+      savedTeams: next.savedTeams,
       planner: next.planner,
       battleMode: next.battleMode,
       battleTrainerCategory: next.battleTrainerCategory,
@@ -3888,6 +4074,7 @@
     return (
       !payload.caught.length &&
       payload.team.every((slot) => !slot.species) &&
+      !payload.savedTeams.length &&
       payload.planner.every((slot) => !slot.species && !slot.note) &&
       payload.battleMode === "custom" &&
       payload.battleTargets.every((target) => !target)
@@ -4176,6 +4363,7 @@
       caught: sanitizeCaught(input.caught),
       badges: sanitizeBadges(input.badges),
       team: sanitizeSlots(input.team, blankTeamSlot),
+      savedTeams: sanitizeSavedTeams(input.savedTeams),
       planner: sanitizeSlots(input.planner, blankPlannerSlot),
       battleMode,
       battleTrainerCategory,
@@ -4195,6 +4383,7 @@
       caught: {},
       badges: {},
       team: Array.from({ length: 6 }, blankTeamSlot),
+      savedTeams: [],
       planner: Array.from({ length: 6 }, blankPlannerSlot),
       battleMode: "custom",
       battleTrainerCategory,
@@ -4240,6 +4429,32 @@
     });
   }
 
+  function sanitizeSavedTeams(input) {
+    if (!Array.isArray(input)) return [];
+    const seen = new Set();
+    return input
+      .map(sanitizeSavedTeam)
+      .filter(Boolean)
+      .filter((savedTeam) => {
+        if (seen.has(savedTeam.id)) return false;
+        seen.add(savedTeam.id);
+        return true;
+      })
+      .slice(0, maxSavedTeams);
+  }
+
+  function sanitizeSavedTeam(input) {
+    if (!input || typeof input !== "object") return null;
+    const team = sanitizeSlots(input.team, blankTeamSlot);
+    if (!team.some((slot) => slot.species)) return null;
+    return {
+      id: typeof input.id === "string" && input.id.trim() ? input.id.trim().slice(0, 80) : makeId(),
+      name: cleanTeamSaveName(input.name) || "Saved team",
+      savedAt: typeof input.savedAt === "string" && input.savedAt.trim() ? input.savedAt : new Date().toISOString(),
+      team,
+    };
+  }
+
   function sanitizeTargets(input) {
     return Array.from({ length: 2 }, (_, index) => {
       const value = Array.isArray(input) ? input[index] : "";
@@ -4271,6 +4486,10 @@
 
   function cleanTeamNickname(value) {
     return String(value || "").replace(/\s+/g, " ").trim().slice(0, 32);
+  }
+
+  function cleanTeamSaveName(value) {
+    return String(value || "").replace(/\s+/g, " ").trim().slice(0, 48);
   }
 
   function statName(key) {

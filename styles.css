@@ -949,6 +949,7 @@ img {
 }
 
 .legendary-filter-button {
+  position: relative;
   min-width: 0;
   min-height: 76px;
   display: grid;
@@ -963,6 +964,7 @@ img {
   cursor: pointer;
   font-size: 0.76rem;
   font-weight: 900;
+  overflow: hidden;
 }
 
 .legendary-filter-button img {
@@ -995,6 +997,28 @@ img {
 
 .legendary-filter-button.is-active {
   box-shadow: 0 8px 20px color-mix(in srgb, var(--accent-3) 22%, transparent);
+}
+
+.legendary-filter-button.is-caught img {
+  filter: saturate(0.65) brightness(0.9);
+}
+
+.legendary-filter-caught-badge {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  padding: 2px 5px;
+  border: 1px solid color-mix(in srgb, var(--accent-2) 76%, #fff);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent-2) 88%, #102018);
+  color: #fff;
+  font-size: 0.58rem;
+  font-style: normal;
+  font-weight: 950;
+  letter-spacing: 0.04em;
+  line-height: 1.1;
+  text-transform: uppercase;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.22);
 }
 
 .field {
@@ -2299,6 +2323,97 @@ summary {
 .team-offense-summary h3,
 .team-offense-summary p {
   margin: 0;
+}
+
+.team-save-manager {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.team-save-manager header,
+.team-save-controls,
+.team-save-entry,
+.team-save-entry-main,
+.team-save-actions,
+.team-save-sprites {
+  display: flex;
+  gap: 10px;
+}
+
+.team-save-manager header,
+.team-save-entry,
+.team-save-entry-main {
+  align-items: center;
+  justify-content: space-between;
+}
+
+.team-save-manager h3,
+.team-save-manager p {
+  margin: 0;
+}
+
+.team-save-controls {
+  align-items: end;
+  flex-wrap: wrap;
+}
+
+.team-save-list {
+  display: grid;
+  gap: 8px;
+}
+
+.team-save-entry {
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.team-save-entry-main {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.team-save-entry-main strong,
+.team-save-entry-main small {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.team-save-sprites {
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.team-save-sprites .mini-sprite {
+  width: 34px;
+  height: 34px;
+}
+
+.team-save-sprites .mini-sprite img {
+  width: 30px;
+  height: 30px;
+}
+
+.team-save-actions {
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.team-save-status:empty {
+  display: none;
 }
 
 .coverage-type-grid {
@@ -3649,6 +3764,18 @@ summary {
 
   .team-grid {
     grid-template-columns: 1fr;
+  }
+
+  .team-save-manager header,
+  .team-save-entry,
+  .team-save-entry-main,
+  .team-save-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .team-save-sprites {
+    justify-content: flex-start;
   }
 
   .coverage-type-grid,

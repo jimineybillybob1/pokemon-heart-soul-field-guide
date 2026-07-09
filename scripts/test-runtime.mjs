@@ -204,6 +204,27 @@ badgeApp.click("[data-badge]");
 const legendaryApp = runApp();
 legendaryApp.elementFor("[data-view]").dataset.view = "legendaries";
 legendaryApp.click("[data-view]");
+const legendaryCaughtApp = runApp();
+legendaryCaughtApp.elementFor("[data-view]").dataset.view = "legendaries";
+legendaryCaughtApp.click("[data-view]");
+legendaryCaughtApp.elementFor("[data-caught]").dataset.caught = "Ho Oh";
+legendaryCaughtApp.click("[data-caught]");
+legendaryCaughtApp.click("[data-legendary-hide-caught]");
+const teamSaveApp = runApp(bossState);
+teamSaveApp.elementFor("[data-view]").dataset.view = "team";
+teamSaveApp.click("[data-view]");
+teamSaveApp.click("#save-current-team");
+const savedTeamState = JSON.parse(teamSaveApp.context.localStorage.getItem(saveKey) || "{}");
+
+function appearsInOrder(haystack, needles) {
+  let cursor = -1;
+  return needles.every((needle) => {
+    const index = haystack.indexOf(needle, cursor + 1);
+    if (index === -1) return false;
+    cursor = index;
+    return true;
+  });
+}
 
 const checks = {
   dashboardRendered:
@@ -230,11 +251,19 @@ const checks = {
   locationsGroupedByTime:
     defaultApp.elementFor("#location-list").innerHTML.includes("location-time-section") &&
     defaultApp.elementFor("#location-list").innerHTML.includes("location-method"),
+  locationQuickFiltersSorted: appearsInOrder(defaultApp.elementFor("#location-controls").innerHTML, [
+    'data-location-filter="">All Locations',
+    'data-location-filter="Route 1"',
+    'data-location-filter="Route 2"',
+    'data-location-filter="Route 10"',
+    'data-location-filter="Burned Tower 1F"',
+  ]),
   legendaryTabRendered:
     indexHtml.includes('data-view="legendaries"') &&
     indexHtml.includes("assets/items/s_s_ticket.png") &&
     legendaryApp.elementFor("#legendary-controls").innerHTML.includes('data-legendary-filter="ho-oh"') &&
-    legendaryApp.elementFor("#legendary-controls").innerHTML.includes("assets/pokemon/mewtwo.png"),
+    legendaryApp.elementFor("#legendary-controls").innerHTML.includes("assets/pokemon/mewtwo.png") &&
+    legendaryApp.elementFor("#legendary-controls").innerHTML.includes("data-legendary-hide-caught"),
   legendaryGuidesRendered:
     (legendaryApp.elementFor("#legendary-list").innerHTML.match(/data-legendary-section=/g) || []).length === 17 &&
     legendaryApp.elementFor("#legendary-list").innerHTML.includes("Old Sea Map") &&
@@ -243,6 +272,10 @@ const checks = {
     legendaryApp.elementFor("#legendary-list").innerHTML.includes('data-caught="Ho Oh"') &&
     legendaryApp.elementFor("#legendary-list").innerHTML.includes('data-open-moves="Mewtwo"') &&
     !legendaryApp.elementFor("#legendary-list").innerHTML.includes('data-legendary-section="ho-oh" open'),
+  legendaryHideCaught:
+    (legendaryCaughtApp.elementFor("#legendary-list").innerHTML.match(/data-legendary-section=/g) || []).length === 16 &&
+    legendaryCaughtApp.elementFor("#legendary-controls").innerHTML.includes("legendary-filter-caught-badge") &&
+    legendaryCaughtApp.elementFor("#legendary-count").textContent === "Showing 16 of 17",
   speciesModalRendered:
     speciesModalApp.elementFor("#modal-root").innerHTML.includes("data-species-modal=\"Bulbasaur\"") &&
     speciesModalApp.elementFor("#modal-root").innerHTML.includes("Mark caught") &&
@@ -284,7 +317,16 @@ const checks = {
     defaultApp.elementFor("#team-grid").innerHTML.includes("list=\"team-item-list\"") &&
     defaultApp.elementFor("#team-grid").innerHTML.includes("Nickname") &&
     defaultApp.elementFor("#team-grid").innerHTML.includes("Held item") &&
-    defaultApp.elementFor("#team-grid").innerHTML.includes("Nature"),
+    defaultApp.elementFor("#team-grid").innerHTML.includes("Nature") &&
+    defaultApp.elementFor("#team-grid").innerHTML.includes("Saved Teams") &&
+    defaultApp.elementFor("#team-grid").innerHTML.includes("save-current-team"),
+  teamLocalSaves:
+    Array.isArray(savedTeamState.savedTeams) &&
+    savedTeamState.savedTeams.length === 1 &&
+    savedTeamState.savedTeams[0].team[0].species === "Bulbasaur" &&
+    savedTeamState.savedTeams[0].team[0].moves.includes("Vine Whip") &&
+    teamSaveApp.elementFor("#team-grid").innerHTML.includes("data-load-saved-team") &&
+    teamSaveApp.elementFor("#team-grid").innerHTML.includes("Sprout"),
   teamBuilderDetails:
     bossApp.elementFor("#team-grid").innerHTML.includes("Offensive Coverage") &&
     bossApp.elementFor("#team-grid").innerHTML.includes("Grass") &&
@@ -358,8 +400,10 @@ if (
   !checks.dexCardsHideNoneAbilities ||
   !checks.locationsHaveClickableSpriteEncounters ||
   !checks.locationsGroupedByTime ||
+  !checks.locationQuickFiltersSorted ||
   !checks.legendaryTabRendered ||
   !checks.legendaryGuidesRendered ||
+  !checks.legendaryHideCaught ||
   !checks.speciesModalRendered ||
   !checks.itemIconsRendered ||
   !checks.itemDescriptionsRendered ||
@@ -372,6 +416,7 @@ if (
   !checks.trainerMoveTooltipsRendered ||
   checks.teamSlotsRendered !== 6 ||
   !checks.teamBuilderEnhanced ||
+  !checks.teamLocalSaves ||
   !checks.teamBuilderDetails ||
   !checks.teamOverviewRendered ||
   !checks.plannerEnhanced ||

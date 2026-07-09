@@ -38,11 +38,24 @@ const caughtStat = await page.textContent("#stat-caught");
 
 await page.click("[data-view=\"team\"]");
 const teamSlots = await page.locator("#team-grid .slot-card").count();
-await page.selectOption("[data-team-species=\"0\"]", "Mareep");
+await page.fill("[data-team-species=\"0\"]", "Mareep");
+await page.press("[data-team-species=\"0\"]", "Enter");
 const selectedTeam = await page.locator("#team-grid .slot-card").first().textContent();
+await page.fill("#team-save-name", "Mareep test team");
+await page.click("#save-current-team");
+const savedTeamEntries = await page.locator(".team-save-entry").count();
+const savedTeamText = await page.locator(".team-save-entry").first().textContent();
 
 await page.click("[data-view=\"locations\"]");
 const locationVisible = await page.locator("#view-locations.is-active").count();
+const locationFilterLabels = await page.$$eval(".location-filter-button", (buttons) =>
+  buttons.slice(0, 15).map((button) => button.textContent.trim()),
+);
+const locationQuickFiltersSorted =
+  locationFilterLabels[0] === "All Locations" &&
+  locationFilterLabels.indexOf("Route 1") > 0 &&
+  locationFilterLabels.indexOf("Route 2") > locationFilterLabels.indexOf("Route 1") &&
+  locationFilterLabels.indexOf("Route 10") > locationFilterLabels.indexOf("Route 2");
 
 await page.click("[data-view=\"legendaries\"]");
 const legendaryVisible = await page.locator("#view-legendaries.is-active").count();
@@ -59,7 +72,11 @@ const legendaryDetailsVisible =
 await page.click("[data-legendary-section=\"ho-oh\"] [data-caught=\"Ho Oh\"]");
 const legendaryCaught = await page.textContent("[data-legendary-section=\"ho-oh\"] [data-caught=\"Ho Oh\"]");
 const legendaryStayedOpen = await page.locator("[data-legendary-section=\"ho-oh\"][open]").count();
+const legendaryCaughtFilterBadge = await page.locator(".legendary-filter-button.is-caught .legendary-filter-caught-badge").count();
 await page.click("[data-legendary-filter=\"\"]");
+await page.click("[data-legendary-hide-caught]");
+const legendaryHiddenCaughtCards = await page.locator(".legendary-card").count();
+await page.click("[data-legendary-hide-caught]");
 await page.click("[data-legendary-sections=\"collapse\"]");
 const legendaryCollapsed = await page.locator(".legendary-card[open]").count();
 await page.click("[data-legendary-sections=\"expand\"]");
@@ -73,7 +90,10 @@ const result = {
   caughtStat,
   teamSlots,
   selectedTeamHasMareep: selectedTeam.includes("Mareep"),
+  savedTeamEntries,
+  savedTeamHasMareep: savedTeamText.includes("Mareep"),
   locationVisible,
+  locationQuickFiltersSorted,
   legendaryVisible,
   legendaryCards,
   legendaryInitiallyOpen,
@@ -83,6 +103,8 @@ const result = {
   legendaryDetailsVisible,
   legendaryCaught,
   legendaryStayedOpen,
+  legendaryCaughtFilterBadge,
+  legendaryHiddenCaughtCards,
   legendaryCollapsed,
   legendaryExpanded,
   errors,
@@ -98,7 +120,10 @@ if (
   caughtStat !== "1" ||
   teamSlots !== 6 ||
   !result.selectedTeamHasMareep ||
+  savedTeamEntries !== 1 ||
+  !result.savedTeamHasMareep ||
   locationVisible !== 1 ||
+  !locationQuickFiltersSorted ||
   legendaryVisible !== 1 ||
   legendaryCards !== 17 ||
   legendaryInitiallyOpen !== 0 ||
@@ -108,6 +133,8 @@ if (
   !legendaryDetailsVisible ||
   legendaryCaught?.trim() !== "Caught" ||
   legendaryStayedOpen !== 1 ||
+  legendaryCaughtFilterBadge < 1 ||
+  legendaryHiddenCaughtCards !== 16 ||
   legendaryCollapsed !== 0 ||
   legendaryExpanded !== 17 ||
   errors.length
