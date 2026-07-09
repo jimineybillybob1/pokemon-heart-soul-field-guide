@@ -17,7 +17,7 @@
   const defaultSyncEndpoint = "https://heart-soul-field-guide-sync.james-stewart1992.workers.dev";
   const syncEndpoint = (window.HEART_SOUL_SYNC_ENDPOINT || defaultSyncEndpoint).replace(/\/+$/, "");
   const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  const appShellVersion = "heart-soul-field-guide-v29";
+  const appShellVersion = "heart-soul-field-guide-v30";
   const species = [...data.species].sort((a, b) => Number(a.dex || 0) - Number(b.dex || 0));
   const speciesByName = new Map(species.map((entry) => [entry.name, entry]));
   const speciesByLookup = new Map(species.map((entry) => [normalize(entry.name), entry]));
@@ -1903,6 +1903,7 @@
           <span class="legendary-card-title">
             <small>${text(guide.group)}</small>
             <strong>${text(guide.name)}</strong>
+            ${entry ? `<div class="type-row legendary-card-types">${entry.types.map(typePill).join("")}</div>` : ""}
             <span>${text(guide.availability)}</span>
           </span>
           <button class="small-button caught-toggle legendary-caught-toggle ${caught ? "is-caught" : ""}" type="button" data-caught="${attr(caughtName)}" aria-label="${attr(caught ? `Mark ${guide.name} as not caught` : `Mark ${guide.name} as caught`)}">

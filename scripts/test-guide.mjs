@@ -62,6 +62,7 @@ const legendaryVisible = await page.locator("#view-legendaries.is-active").count
 const legendaryCards = await page.locator(".legendary-card").count();
 const legendaryInitiallyOpen = await page.locator(".legendary-card[open]").count();
 const legendaryFilterSprites = await page.locator(".legendary-filter-button img").count();
+const legendarySummaryTypes = await page.locator(".legendary-card-title .legendary-card-types .type").count();
 await page.click("[data-legendary-filter=\"ho-oh\"]");
 const filteredLegendaryCards = await page.locator(".legendary-card").count();
 const filteredLegendaryOpen = await page.locator(".legendary-card[open]").count();
@@ -98,6 +99,7 @@ const result = {
   legendaryCards,
   legendaryInitiallyOpen,
   legendaryFilterSprites,
+  legendarySummaryTypes,
   filteredLegendaryCards,
   filteredLegendaryOpen,
   legendaryDetailsVisible,
@@ -128,6 +130,7 @@ if (
   legendaryCards !== 17 ||
   legendaryInitiallyOpen !== 0 ||
   legendaryFilterSprites !== 18 ||
+  legendarySummaryTypes < 17 ||
   filteredLegendaryCards !== 1 ||
   filteredLegendaryOpen !== 1 ||
   !legendaryDetailsVisible ||

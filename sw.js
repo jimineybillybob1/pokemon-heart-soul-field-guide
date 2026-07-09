@@ -1,4 +1,4 @@
-const CACHE_NAME = "heart-soul-field-guide-v29";
+const CACHE_NAME = "heart-soul-field-guide-v30";
 const CORE_ASSETS = [
   "./",
   "./index.html",

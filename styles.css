@@ -1606,6 +1606,17 @@ summary {
   font-size: 0.86rem;
 }
 
+.legendary-card-types {
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.legendary-card-types .type {
+  min-height: 22px;
+  padding: 0 8px;
+  font-size: 0.74rem;
+}
+
 .legendary-card-time {
   min-width: 52px;
   padding: 5px 8px;

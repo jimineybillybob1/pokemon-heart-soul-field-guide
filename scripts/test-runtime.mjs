@@ -269,6 +269,8 @@ const checks = {
     legendaryApp.elementFor("#legendary-list").innerHTML.includes("Old Sea Map") &&
     legendaryApp.elementFor("#legendary-list").innerHTML.includes("Move left 4, face down, and press A.") &&
     legendaryApp.elementFor("#legendary-list").innerHTML.includes("Base stats") &&
+    legendaryApp.elementFor("#legendary-list").innerHTML.includes("legendary-card-types") &&
+    legendaryApp.elementFor("#legendary-list").innerHTML.includes(">Fire</span>") &&
     legendaryApp.elementFor("#legendary-list").innerHTML.includes('data-caught="Ho Oh"') &&
     legendaryApp.elementFor("#legendary-list").innerHTML.includes('data-open-moves="Mewtwo"') &&
     !legendaryApp.elementFor("#legendary-list").innerHTML.includes('data-legendary-section="ho-oh" open'),
